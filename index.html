@@ -316,14 +316,14 @@ const ACCESSORIES=[
 const ACC_LOOKUP=Object.fromEntries(ACCESSORIES.map(a=>[a.id,a]));
 const ACC_BY_SLOT={};ACCESSORIES.forEach(a=>(ACC_BY_SLOT[a.slot]??=[]).push(a));
 const SLOT_ORDER=["hat","glasses","neck","top","bottoms"];
-const SLOT_LABELS={hat:"HATS",glasses:"EYES",neck:"NECK",top:"SHIRTS",bottoms:"BOTTOMS"};
+const SLOT_LABELS={hat:"HATS",glasses:"GLASSES",neck:"NECKLACE",top:"TOPS",bottoms:"BOTTOMS"};
 const BODY_FITTED=new Set(["top","bottoms"]);
 const STANDALONE=new Set(["hat","glasses","neck"]);
 
 const ANCHORS={
-  fox:{eye_cx:307,eye_cy:228,neck_y:368,w:522,h:609},
-  dog:{eye_cx:222,eye_cy:178,neck_y:310,w:447,h:548},
-  cat:{eye_cx:176,eye_cy:225,neck_y:351,w:365,h:587},
+  fox:{eye_cx:307,eye_cy:228,neck_y:368,crown_y:85,w:522,h:609},
+  dog:{eye_cx:222,eye_cy:178,neck_y:310,crown_y:1,w:447,h:548},
+  cat:{eye_cx:176,eye_cy:225,neck_y:351,crown_y:65,w:365,h:587},
 };
 
 const ACCEPTANCE_LETTERS={
@@ -575,32 +575,49 @@ class AvatarSelectScene extends Scene {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  SCENE 4: DRESS UP
+//  SCENE 4: DRESS UP (Cute Pastel Redesign)
 // ══════════════════════════════════════════════════════════════════
+const DC = {
+  bg: '#fcf5f2', bg2: '#f8eeeb',
+  shelfPastel: '#f5e6eb', shelfBorder: '#dcc3cd', shelfLabelBg: '#ebd2dc',
+  cardBg: '#fffaf8', cardHover: '#fff5f0', cardEquipped: '#fff0eb',
+  cardBorder: '#e1d2d7', equippedRing: '#e68282', equippedDot: '#f07378',
+  itemName: '#785a64', mirrorFrame: '#d2b9a0', mirrorInner: '#c3aa91',
+  mirrorBg: '#faf5f0', btnConfirm: '#d2a09b', btnConfirmHv: '#c38c87',
+  btnReset: '#d7d2cd', btnResetHv: '#c8c3be', btnExit: '#e1dade', btnExitHv: '#d2cac0',
+  title: '#8c5560', sparkle: '#ffdcb4',
+};
+const CARD_W=120, CARD_H=130, THUMB_SZ=88;
+
 class DressUpScene extends Scene {
   startup(p){super.startup(p);this.species=p.species||'cat';this.equipped={hat:null,glasses:null,neck:null,top:null,bottoms:null};
     this.hoverItem=null;this.tooltip='';this.tooltipTimer=0;this.mx=0;this.my=0;
+    this.animTime=0;this.sparkles=[];
     this._buildLayout();
   }
   _buildLayout(){
-    this.slotRows={};this.itemBtns={};const lm=40,rw=520,rh=104,sy=100,rg=8,bs=96;
+    this.slotRows={};this.itemBtns={};const lm=28,rw=560,rh=135,sy=88,rg=6;
     SLOT_ORDER.forEach((slot,i)=>{
       const ry=sy+i*(rh+rg);this.slotRows[slot]={x:lm,y:ry,w:rw,h:rh};
-      const items=ACC_BY_SLOT[slot]||[];const bax=lm+140,baw=rw-140-16,tbw=items.length*bs+(items.length-1)*12,bsx=bax+(baw-tbw)/2;
-      items.forEach((a,j)=>{this.itemBtns[a.id]={x:bsx+j*(bs+12),y:ry+(rh-bs)/2,w:bs,h:bs};});
+      const items=ACC_BY_SLOT[slot]||[];const labelW=100,bax=lm+labelW,baw=rw-labelW-12;
+      const tcw=items.length*CARD_W+(items.length-1)*10,bsx=bax+(baw-tcw)/2;
+      items.forEach((a,j)=>{this.itemBtns[a.id]={x:bsx+j*(CARD_W+10),y:ry+(rh-CARD_H)/2,w:CARD_W,h:CARD_H};});
     });
-    const bw=240,bh=56,bg=12,lrb=sy+5*(rh+rg),by=lrb+20;
-    this.resetBtn={x:lm,y:by,w:bw,h:bh};this.confirmBtn={x:lm+bw+bg,y:by,w:bw,h:bh};
-    this.exitBtn={x:lm,y:by+bh+bg,w:bw*2+bg,h:bh};
+    const bw=180,bh=48,bg=10,lrb=sy+5*(rh+rg),by=lrb+12;
+    const totalB=bw*3+bg*2,bs=lm+(rw-totalB)/2;
+    this.resetBtn={x:bs,y:by,w:bw,h:bh};
+    this.confirmBtn={x:bs+bw+bg,y:by,w:bw,h:bh};
+    this.exitBtn={x:bs+(bw+bg)*2,y:by,w:bw,h:bh};
   }
   handleClick(x,y){
     if(inRect(x,y,this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h)){this._confirm();return;}
-    if(inRect(x,y,this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h)){for(const s of SLOT_ORDER)this.equipped[s]=null;this.tooltip='Outfit reset';this.tooltipTimer=1.5;return;}
+    if(inRect(x,y,this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h)){
+      for(const s of SLOT_ORDER)this.equipped[s]=null;this.tooltip='Outfit reset!';this.tooltipTimer=1.5;return;}
     if(inRect(x,y,this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h)){this.nextScene='MAIN_MENU';this.done=true;return;}
     for(const[aid,r]of Object.entries(this.itemBtns)){
       if(inRect(x,y,r.x,r.y,r.w,r.h)){const a=ACC_LOOKUP[aid];
         if(this.equipped[a.slot]===aid){this.equipped[a.slot]=null;this.tooltip=`Removed ${a.name}`;}
-        else{this.equipped[a.slot]=aid;this.tooltip=`\u201c${a.flavor}\u201d`;}
+        else{this.equipped[a.slot]=aid;this.tooltip=`\u201c${a.flavor}\u201d`;this._spawnSparkles(r.x+r.w/2,r.y+r.h/2,6);}
         this.tooltipTimer=2.5;return;}
     }
   }
@@ -614,85 +631,124 @@ class DressUpScene extends Scene {
     Object.assign(this.persistent,{equipped_accessories:{...this.equipped},cosmetic_tags:tags});
     this.nextScene='COLLEGE_APP';this.done=true;
   }
-  update(dt){if(this.tooltipTimer>0){this.tooltipTimer-=dt;if(this.tooltipTimer<=0)this.tooltip='';}}
+  _spawnSparkles(x,y,n){
+    for(let i=0;i<n;i++){
+      const angle=Math.random()*Math.PI*2,speed=30+Math.random()*50,life=0.4+Math.random()*0.5;
+      this.sparkles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed-30,life,maxLife:life,size:2+Math.random()*3});
+    }
+  }
+  update(dt){
+    this.animTime+=dt;
+    if(this.tooltipTimer>0){this.tooltipTimer-=dt;if(this.tooltipTimer<=0)this.tooltip='';}
+    this.sparkles=this.sparkles.filter(s=>{s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=60*dt;s.life-=dt;return s.life>0;});
+  }
   draw(){
-    drawParchmentBg();
-    // Title with shadow
-    drawText(`Dress Up \u2014 ${this.species.charAt(0).toUpperCase()+this.species.slice(1)}`,W/2,28,C.text,font(48,true),'center','top');
-    const ruleY=82;drawLine(60,ruleY,W-60,ruleY,C.rule,1.5);
+    // Striped pastel background
+    fillRect(0,0,W,H,DC.bg);
+    for(let y=0;y<H;y+=6)if((y/6|0)%2===0)drawLine(0,y,W,y,DC.bg2,1);
+    // Soft double border
+    strokeRect(8,8,W-16,H-16,DC.shelfBorder,2,12);
+    strokeRect(12,12,W-24,H-24,'#f0e1e6',1,10);
+    // Title
+    const sn=this.species.charAt(0).toUpperCase()+this.species.slice(1);
+    drawText(`Dress Up Your ${sn}!`,W/2,36,DC.title,font(44,true),'center','middle');
+    const ruleY=68;drawLine(50,ruleY,W-50,ruleY,DC.shelfBorder,1);
+    // Decorative diamonds flanking title
+    const ttW=measureText(`Dress Up Your ${sn}!`,font(44,true));
+    const ttX=W/2-ttW/2;
+    for(const ox of[ttX-18,W/2+ttW/2+18]){
+      ctx.fillStyle=DC.equippedRing;ctx.beginPath();
+      ctx.moveTo(ox,36-5);ctx.lineTo(ox+5,36);ctx.lineTo(ox,36+5);ctx.lineTo(ox-5,36);ctx.closePath();ctx.fill();
+    }
     // Wardrobe shelves
     for(const slot of SLOT_ORDER){
       const rr=this.slotRows[slot];
-      // Richer shelf gradient
-      const sg=ctx.createLinearGradient(rr.x,rr.y,rr.x,rr.y+rr.h);
-      sg.addColorStop(0,C.shelfLight);sg.addColorStop(0.15,C.shelfBg);sg.addColorStop(0.85,C.shelfBg);sg.addColorStop(1,C.shelfDark);
-      ctx.fillStyle=sg;ctx.beginPath();ctx.roundRect(rr.x,rr.y,rr.w,rr.h,8);ctx.fill();
-      strokeRect(rr.x,rr.y,rr.w,rr.h,C.shelfEdge,2,8);
-      // Slot label in brass badge
-      const lw=measureText(SLOT_LABELS[slot],font(22,true))+20,lh=28;
-      fillRect(rr.x+10,rr.y+rr.h/2-lh/2,lw,lh,'rgba(0,0,0,0.2)',4);
-      drawText(SLOT_LABELS[slot],rr.x+10+lw/2,rr.y+rr.h/2,C.bg,font(22,true),'center','middle');
-      // Item cards with shadow
+      fillRect(rr.x,rr.y,rr.w,rr.h,DC.shelfPastel,12);
+      // Top highlight
+      fillRect(rr.x+2,rr.y+2,rr.w-4,3,'#faf0f3',2);
+      strokeRect(rr.x,rr.y,rr.w,rr.h,DC.shelfBorder,1,12);
+      // Slot label pill
+      const lt=SLOT_LABELS[slot],bw2=85,bh2=28,bx=rr.x+8,by=rr.y+rr.h/2-bh2/2;
+      fillRect(bx,by,bw2,bh2,DC.shelfLabelBg,14);strokeRect(bx,by,bw2,bh2,DC.shelfBorder,1,14);
+      drawText(lt,bx+bw2/2,by+bh2/2,DC.title,font(22,true),'center','middle');
+      // Item cards
       for(const a of(ACC_BY_SLOT[slot]||[])){
         const r=this.itemBtns[a.id],eq=this.equipped[slot]===a.id,hov=this.hoverItem===a.id;
-        if(eq||hov){
-          ctx.save();ctx.shadowColor='rgba(30,20,10,0.15)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
-          fillRect(r.x,r.y,r.w,r.h,eq?C.panelHover:hov?'#fffaf0':C.panelBg,8);
-          ctx.restore();
-        } else {
-          fillRect(r.x,r.y,r.w,r.h,C.panelBg,8);
-        }
-        if(eq){strokeRect(r.x-1,r.y-1,r.w+2,r.h+2,C.accentLight,2,9);strokeRect(r.x,r.y,r.w,r.h,C.accent,2.5,8);}
-        else strokeRect(r.x,r.y,r.w,r.h,hov?C.accentLight:C.panelBorder,hov?2:1.5,8);
+        let bg=DC.cardBg,bc=DC.cardBorder,bwi=1,dy=0;
+        if(eq){bg=DC.cardEquipped;bc=DC.equippedRing;bwi=2;}
+        else if(hov){bg=DC.cardHover;bc='#d7b9c3';bwi=2;dy=-2;}
+        fillRect(r.x,r.y+dy,r.w,r.h,bg,10);strokeRect(r.x,r.y+dy,r.w,r.h,bc,bwi,10);
+        // Thumbnail
         const img=this._getAccImg(a);
-        if(img){const pad=16,md=r.w-pad*2,sc=Math.min(md/img.width,md/img.height),nw=img.width*sc,nh=img.height*sc;
-          ctx.drawImage(img,r.x+r.w/2-nw/2,r.y+r.h/2-nh/2,nw,nh);}
-        if(eq)fillCircle(r.x+r.w-10,r.y+10,6,C.accent);
+        const thumbH=CARD_H-28;
+        if(img){const pad=16,md=THUMB_SZ-pad*2,sc=Math.min(md/img.width,md/img.height),nw=img.width*sc,nh=img.height*sc;
+          ctx.drawImage(img,r.x+r.w/2-nw/2,r.y+dy+thumbH/2-nh/2+2,nw,nh);}
+        // Item name
+        drawText(a.name,r.x+r.w/2,r.y+dy+r.h-14,DC.itemName,font(15),'center','middle');
+        // Equipped dot
+        if(eq){fillCircle(r.x+r.w-12,r.y+dy+12,7,DC.equippedDot);fillCircle(r.x+r.w-12,r.y+dy+12,4,'#fff');fillCircle(r.x+r.w-12,r.y+dy+12,2,DC.equippedDot);}
       }
     }
-    // Character preview panel
-    const charX=620,avW=W-charX-32,anch=ANCHORS[this.species],pvH=520,pvScale=pvH/anch.h,pvW=Math.max(1,Math.round(anch.w*pvScale));
-    const ccx=charX+(avW-pvW)/2;
-    drawPanelWithShadow(ccx-20,ruleY+4,pvW+40,pvH+40,10,'rgba(236,226,208,0.5)');
-    drawCornerOrnaments(ccx-16,ruleY+8,pvW+32,pvH+32,18);
-    this._drawCharacter(620,ruleY+16);
+    // Mirror frame (character preview)
+    const px=608,py=ruleY+8,pw=W-px-20,ph=H-py-60;
+    fillRect(px,py,pw,ph,DC.mirrorFrame,16);fillRect(px+6,py+6,pw-12,ph-12,DC.mirrorInner,12);
+    fillRect(px+10,py+10,pw-20,ph-20,DC.mirrorBg,10);
+    // Corner ornaments
+    for(const[cx2,cy2]of[[px+14,py+14],[px+pw-14,py+14],[px+14,py+ph-14],[px+pw-14,py+ph-14]]){
+      ctx.fillStyle=C.accentLight;ctx.beginPath();
+      ctx.moveTo(cx2,cy2-8);ctx.lineTo(cx2+8,cy2);ctx.lineTo(cx2,cy2+8);ctx.lineTo(cx2-8,cy2);ctx.closePath();ctx.fill();
+    }
+    this._drawCharacter(px+10,py+10,pw-20,ph-20);
     // Equipped count
     const ec=Object.values(this.equipped).filter(v=>v).length;
-    drawText(`${ec}/5 items equipped`,ccx+pvW/2,ruleY+pvH+52,C.textDim,font(26),'center','top');
-    // Buttons
-    const ml={x:this.mx,y:this.my};
-    drawFancyButton(this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h,'RESET',font(28,true),
-      inRect(ml.x,ml.y,this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h));
-    drawFancyButton(this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h,'Continue',font(28,true),
-      inRect(ml.x,ml.y,this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h));
-    drawFancyButton(this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h,'Exit to Menu',font(28,true),
-      inRect(ml.x,ml.y,this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h));
-    // Tooltip as floating panel
-    if(this.tooltip){
-      const tw=measureText(this.tooltip,font(24))+32,th=36,tx=40,ty=H-50;
-      drawPanelWithShadow(tx,ty,tw,th,6,'#f5ebdc');
-      drawText(this.tooltip,tx+16,ty+th/2,C.accentDark,font(24),'left','middle');
+    drawText(`${ec}/5 items equipped`,px+pw/2,py+ph-42,C.textDim,font(22),'center','middle');
+    // Animated sparkle dots on frame
+    const t=this.animTime;
+    for(let i=0;i<4;i++){
+      const ang=t*0.5+i*Math.PI/2,sx=px+pw/2+Math.cos(ang)*(pw/2-8),sy2=py+ph/2+Math.sin(ang)*(ph/2-8);
+      const al=0.5+0.5*Math.sin(t*2+i);ctx.save();ctx.globalAlpha=al;fillCircle(sx,sy2,3,DC.sparkle);ctx.restore();
     }
+    // Pill buttons
+    const ml={x:this.mx,y:this.my};
+    this._drawPill(this.resetBtn,'Reset',ml,DC.btnReset,DC.btnResetHv,false);
+    this._drawPill(this.confirmBtn,'Save & Continue',ml,DC.btnConfirm,DC.btnConfirmHv,true);
+    this._drawPill(this.exitBtn,'Exit',ml,DC.btnExit,DC.btnExitHv,false);
+    // Tooltip pill
+    if(this.tooltip){
+      const tw=measureText(this.tooltip,font(22))+28,th=32,tx=40,ty=H-44;
+      fillRect(tx,ty,tw,th,'#fff5f2',16);strokeRect(tx,ty,tw,th,DC.shelfBorder,1,16);
+      drawText(this.tooltip,tx+14,ty+th/2,DC.title,font(22),'left','middle');
+    }
+    // Sparkle particles
+    for(const s of this.sparkles){
+      const al=s.life/s.maxLife;ctx.save();ctx.globalAlpha=al;fillCircle(s.x,s.y,s.size,DC.sparkle);ctx.restore();
+    }
+  }
+  _drawPill(btn,text,ml,idle,hover,bold){
+    const hov=inRect(ml.x,ml.y,btn.x,btn.y,btn.w,btn.h);
+    fillRect(btn.x,btn.y,btn.w,btn.h,hov?hover:idle,btn.h/2);
+    strokeRect(btn.x,btn.y,btn.w,btn.h,DC.shelfBorder,1,btn.h/2);
+    if(!hov){ctx.save();ctx.globalAlpha=0.15;fillRect(btn.x+4,btn.y+2,btn.w-8,btn.h/3,'#fff',btn.h/4);ctx.restore();}
+    drawText(text,btn.x+btn.w/2,btn.y+btn.h/2,C.btnText,font(bold?28:22,bold),'center','middle');
   }
   _getAccImg(a){
     if(BODY_FITTED.has(a.slot))return IMAGES[a.sprite+'_'+this.species]||IMAGES[a.sprite]||null;
     return IMAGES[a.sprite]||null;
   }
-  _drawCharacter(cx,cy){
-    const anch=ANCHORS[this.species],pvH=520,pvScale=pvH/anch.h,pvW=Math.max(1,Math.round(anch.w*pvScale));
-    const avW=W-cx-32,dx=cx+(avW-pvW)/2;
-    // Compose on offscreen canvas
+  _drawCharacter(mx,my,mw,mh){
+    const anch=ANCHORS[this.species],pvH=560,pvScale=pvH/anch.h,pvW=Math.max(1,Math.round(anch.w*pvScale));
+    const dx=mx+(mw-pvW)/2,dy=my+(mh-40-pvH)/2+5;
     const off=document.createElement('canvas');off.width=anch.w;off.height=anch.h;const oc=off.getContext('2d');
     const base=IMAGES[this.species+'_base'];if(base)oc.drawImage(base,0,0);
     for(const slot of['bottoms','top']){const aid=this.equipped[slot];if(aid){const img=IMAGES[ACC_LOOKUP[aid].sprite+'_'+this.species]||IMAGES[ACC_LOOKUP[aid].sprite];if(img)oc.drawImage(img,0,0);}}
     for(const slot of['neck','glasses','hat']){const aid=this.equipped[slot];if(aid){const img=IMAGES[ACC_LOOKUP[aid].sprite];if(img){const p=this._anchorPos(slot,img,anch);oc.drawImage(img,p.x,p.y);}}}
-    ctx.drawImage(off,dx,cy,pvW,pvH);
+    ctx.drawImage(off,dx,dy,pvW,pvH);
   }
   _anchorPos(slot,img,a){
     const sw=img.width,sh=img.height;
-    if(slot==='hat')return{x:a.eye_cx-sw/2,y:Math.max(0,a.eye_cy-sh-30)};
-    if(slot==='glasses')return{x:a.eye_cx-sw/2,y:a.eye_cy-sh/2-8};
-    if(slot==='neck')return{x:a.eye_cx-sw/2,y:a.neck_y-sh/6};
+    if(slot==='hat')return{x:a.eye_cx-sw/2,y:Math.max(0,a.crown_y-Math.round(sh*0.55))};
+    if(slot==='glasses')return{x:a.eye_cx-sw/2,y:a.eye_cy-sh/2};
+    if(slot==='neck')return{x:a.eye_cx-sw/2,y:a.neck_y-sh/4};
     return{x:0,y:0};
   }
 }
