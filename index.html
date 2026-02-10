@@ -122,6 +122,143 @@ function steppedProgress(timer,duration){
   if(t<0.8)return 0.66;return Math.min(1,0.66+(t-0.8)/0.2*0.34);
 }
 
+// ── Polished Drawing Helpers ────────────────────────────────────
+function drawParchmentBg() {
+  fillRect(0,0,W,H,C.bg);
+  const img=IMAGES['parchment_bg'];
+  if(img){ctx.save();ctx.globalAlpha=0.85;ctx.drawImage(img,0,0,W,H);ctx.restore();}
+  // Heavy vignette — dark brown edges matching aged paper look
+  const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.25,W/2,H/2,Math.max(W,H)*0.7);
+  g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(0.55,'rgba(42,30,18,0.04)');g.addColorStop(0.78,'rgba(42,30,18,0.22)');g.addColorStop(1,'rgba(30,18,8,0.6)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+}
+
+function drawOrnamentalDivider(cx,y,width) {
+  const hw=width/2,ds=7;
+  ctx.save();ctx.strokeStyle=C.rule;ctx.fillStyle=C.accent;ctx.lineWidth=1.5;
+  // Lines
+  drawLine(cx-hw,y,cx-ds-16,y,C.rule,1.5);
+  drawLine(cx+ds+16,y,cx+hw,y,C.rule,1.5);
+  // Diamond
+  ctx.beginPath();ctx.moveTo(cx,y-ds);ctx.lineTo(cx+ds,y);ctx.lineTo(cx,y+ds);ctx.lineTo(cx-ds,y);ctx.closePath();ctx.fill();
+  // Flourish curves
+  ctx.strokeStyle=C.accentLight;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-ds-16,y);ctx.quadraticCurveTo(cx-ds-8,y-8,cx-ds-1,y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+ds+16,y);ctx.quadraticCurveTo(cx+ds+8,y-8,cx+ds+1,y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx-ds-16,y);ctx.quadraticCurveTo(cx-ds-8,y+8,cx-ds-1,y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+ds+16,y);ctx.quadraticCurveTo(cx+ds+8,y+8,cx+ds+1,y);ctx.stroke();
+  // Small dots at line ends
+  fillCircle(cx-hw,y,2.5,C.accent);fillCircle(cx+hw,y,2.5,C.accent);
+  ctx.restore();
+}
+
+function drawCornerOrnaments(x,y,w,h,size=28) {
+  ctx.save();ctx.strokeStyle=C.accentLight;ctx.lineWidth=2;
+  const s=size,t=4;
+  // Top-left
+  ctx.beginPath();ctx.moveTo(x,y+s);ctx.lineTo(x,y);ctx.lineTo(x+s,y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+s,y);ctx.lineTo(x+s-t,y+t);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x,y+s);ctx.lineTo(x+t,y+s-t);ctx.stroke();
+  // Top-right
+  ctx.beginPath();ctx.moveTo(x+w-s,y);ctx.lineTo(x+w,y);ctx.lineTo(x+w,y+s);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+w-s,y);ctx.lineTo(x+w-s+t,y+t);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+w,y+s);ctx.lineTo(x+w-t,y+s-t);ctx.stroke();
+  // Bottom-left
+  ctx.beginPath();ctx.moveTo(x,y+h-s);ctx.lineTo(x,y+h);ctx.lineTo(x+s,y+h);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+s,y+h);ctx.lineTo(x+s-t,y+h-t);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x,y+h-s);ctx.lineTo(x+t,y+h-s+t);ctx.stroke();
+  // Bottom-right
+  ctx.beginPath();ctx.moveTo(x+w-s,y+h);ctx.lineTo(x+w,y+h);ctx.lineTo(x+w,y+h-s);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+w-s,y+h);ctx.lineTo(x+w-s+t,y+h-t);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+w,y+h-s);ctx.lineTo(x+w-t,y+h-s+t);ctx.stroke();
+  ctx.restore();
+}
+
+function drawPanelWithShadow(x,y,w,h,r=10,fillColor=C.panelBg) {
+  ctx.save();
+  ctx.shadowColor='rgba(30,20,10,0.18)';ctx.shadowBlur=12;ctx.shadowOffsetX=2;ctx.shadowOffsetY=4;
+  fillRect(x,y,w,h,fillColor,r);
+  ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
+  ctx.restore();
+  strokeRect(x,y,w,h,C.panelBorder,1.5,r);
+}
+
+function drawFancyButton(x,y,w,h,text,f,hover) {
+  ctx.save();
+  // Shadow
+  ctx.shadowColor='rgba(30,20,10,0.22)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;
+  const g=ctx.createLinearGradient(x,y,x,y+h);
+  if(hover){g.addColorStop(0,'#d4ba8e');g.addColorStop(1,'#b89a6a');}
+  else{g.addColorStop(0,'#cdb48a');g.addColorStop(1,'#a89060');}
+  ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(x,y,w,h,8);ctx.fill();
+  ctx.restore();
+  // Inner highlight
+  ctx.save();ctx.globalAlpha=0.35;
+  ctx.strokeStyle='#f0e4cc';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x+10,y+1.5);ctx.lineTo(x+w-10,y+1.5);ctx.stroke();
+  ctx.restore();
+  // Border
+  strokeRect(x,y,w,h,hover?C.accent:'#9a8464',1.5,8);
+  // Text
+  drawText(text,x+w/2,y+h/2,C.btnText,f,'center','middle');
+}
+
+function drawLetterSpaced(text,x,y,color,f,spacing,align='center') {
+  ctx.font=f;ctx.fillStyle=color;ctx.textBaseline='middle';
+  const chars=text.split('');
+  let totalW=0;for(const c of chars)totalW+=ctx.measureText(c).width;
+  totalW+=(chars.length-1)*spacing;
+  let cx=align==='center'?x-totalW/2:align==='right'?x-totalW:x;
+  for(const c of chars){ctx.fillText(c,Math.round(cx),Math.round(y));cx+=ctx.measureText(c).width+spacing;}
+}
+
+function drawTextShadow(text,x,y,color,shadowColor,f,align='center',baseline='middle') {
+  drawText(text,x+1.5,y+2,shadowColor,f,align,baseline);
+  drawText(text,x,y,color,f,align,baseline);
+}
+
+function drawStatBarFancy(x,y,w,h,value,color,label) {
+  // Label
+  drawText(label,x,y-4,color,font(28,true),'left','bottom');
+  drawText(String(Math.round(value)),x+w+12,y-4,C.textDim,font(26),'left','bottom');
+  // Track
+  fillRect(x,y,w,h,'#d4c4a8',h/2);
+  // Tick marks at 25/50/75
+  ctx.save();ctx.globalAlpha=0.25;
+  for(const tick of[0.25,0.5,0.75]){const tx=x+w*tick;drawLine(tx,y+2,tx,y+h-2,'#8a7660',1);}
+  ctx.restore();
+  // Fill
+  const fw=Math.round(w*Math.max(0,Math.min(100,value))/100);
+  if(fw>0){
+    const g=ctx.createLinearGradient(x,y,x,y+h);
+    g.addColorStop(0,color);g.addColorStop(1,darkenColor(color,0.2));
+    ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(x,y,fw,h,h/2);ctx.fill();
+  }
+  // Inner shadow on track
+  ctx.save();ctx.globalAlpha=0.1;
+  const ig=ctx.createLinearGradient(x,y,x,y+h*0.4);
+  ig.addColorStop(0,'rgba(0,0,0,0.3)');ig.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=ig;ctx.beginPath();ctx.roundRect(x,y,w,h,h/2);ctx.fill();
+  ctx.restore();
+  strokeRect(x,y,w,h,'#b0a08a',1,h/2);
+}
+
+function darkenColor(hex,amount) {
+  // Parse rgb() or hex color and darken
+  let r,g,b;
+  if(hex.startsWith('rgb')){const m=hex.match(/(\d+)/g);r=+m[0];g=+m[1];b=+m[2];}
+  else{const h=hex.replace('#','');r=parseInt(h.substr(0,2),16);g=parseInt(h.substr(2,2),16);b=parseInt(h.substr(4,2),16);}
+  r=Math.max(0,Math.round(r*(1-amount)));g=Math.max(0,Math.round(g*(1-amount)));b=Math.max(0,Math.round(b*(1-amount)));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawResultPill(x,y,text,color) {
+  const f=font(26,true),tw=measureText(text,f),pw=tw+28,ph=32;
+  const px=x-pw/2,py=y-ph/2;
+  fillRect(px,py,pw,ph,color,ph/2);
+  drawText(text,x,y,'#fff',f,'center','middle');
+}
+
 // ── Data ────────────────────────────────────────────────────────
 const QUESTIONS=[
   {id:"family_wealth",text:"Growing up, your family\u2019s relationship with money was best described as...",answers:[
@@ -252,6 +389,10 @@ const IMAGES={};
 async function loadAssets() {
   const manifest=[];
   ['cat','dog','fox'].forEach(s=>manifest.push({key:s+'_base',src:`assets/sprites/characters/${s}_base.png`}));
+  // UI assets
+  manifest.push({key:'logo_deer',src:'assets/sprites/ui/logo_deer.png'});
+  manifest.push({key:'parchment_bg',src:'assets/sprites/ui/parchment_bg.png'});
+  manifest.push({key:'wax_seal',src:'assets/sprites/ui/wax_seal.png'});
   const species=['cat','dog','fox'];
   ACCESSORIES.forEach(a=>{
     if(BODY_FITTED.has(a.slot)){
@@ -293,24 +434,45 @@ class Scene {
 class MainMenuScene extends Scene {
   startup(p){super.startup(p);this.hovered=null;}
   handleClick(x,y){
-    if(inRect(x,y,440,498,400,84)){this.nextScene='PERSONALITY_TEST';this.done=true;}
-    if(inRect(x,y,440,618,400,84))this.quit=true;
+    if(inRect(x,y,300,520,400,68)){this.nextScene='PERSONALITY_TEST';this.done=true;}
+    if(inRect(x,y,300,616,400,68))this.quit=true;
   }
-  handleMove(x,y){this.hovered=inRect(x,y,440,498,400,84)?'start':inRect(x,y,440,618,400,84)?'quit':null;}
+  handleMove(x,y){this.hovered=inRect(x,y,300,520,400,68)?'start':inRect(x,y,300,616,400,68)?'quit':null;}
   handleKey(e){if(e.key==='Enter'){this.nextScene='PERSONALITY_TEST';this.done=true;}}
   draw(){
-    fillRect(0,0,W,H,C.bg);const cx=W/2;
-    drawLine(160,120,W-160,120,C.rule,2);
-    // Diamond
-    ctx.fillStyle=C.accent;ctx.beginPath();ctx.moveTo(cx,112);ctx.lineTo(cx+8,120);ctx.lineTo(cx,128);ctx.lineTo(cx-8,120);ctx.closePath();ctx.fill();
-    drawText('HYBRIS',cx,220,C.accentDark,font(72,true),'center','middle');
-    drawText('Create Your Applicant',cx,300,C.textDim,font(32,false,true),'center','middle');
-    drawLine(320,350,W-320,350,C.rule,2);
-    drawText('A holistic assessment of your potential.',cx,400,C.textLight,font(22),'center','middle');
-    drawButton(440,498,400,84,'Begin Assessment',font(28,true),this.hovered==='start');
-    drawButton(440,618,400,84,'Exit',font(28,true),this.hovered==='quit');
-    drawLine(160,H-120,W-160,H-120,C.rule,2);
-    drawText('v1.0  \u00b7  Institutional Review Pending',cx,H-84,C.textLight,font(22),'center','middle');
+    // Parchment background with texture and vignette
+    drawParchmentBg();
+    const cx=W/2;
+
+    // Border inset
+    ctx.save();ctx.globalAlpha=0.25;strokeRect(28,28,W-56,H-56,C.rule,2);ctx.restore();
+
+    // Title: HYBRIS
+    drawText('HYBRIS',cx,190,C.accentDark,font(110,true),'center','middle');
+
+    // "PART I" with flanking rules
+    const partF=font(32,true), partW=measureText('PART I',partF);
+    const partY=295, rGap=16, rLen=150;
+    drawLine(cx-partW/2-rGap-rLen,partY, cx-partW/2-rGap,partY, C.rule,1.5);
+    drawLine(cx+partW/2+rGap,partY, cx+partW/2+rGap+rLen,partY, C.rule,1.5);
+    drawText('PART I',cx,partY,C.textDim,partF,'center','middle');
+
+    // "PROTOTYPE" in crimson red
+    drawText('PROTOTYPE',cx,390,'#8b1a1a',font(60,true),'center','middle');
+
+    // Buttons — left of center to leave room for seal
+    drawFancyButton(300,520,400,68,'BEGIN ASSESSMENT',font(26,true),this.hovered==='start');
+    drawFancyButton(300,616,400,68,'Exit',font(26,true),this.hovered==='quit');
+
+    // Wax seal — bottom right, large
+    const seal=IMAGES['wax_seal'];
+    if(seal){
+      const ss=260, sx=W-250, sy=H-240;
+      ctx.save();
+      ctx.shadowColor='rgba(15,8,3,0.5)';ctx.shadowBlur=22;ctx.shadowOffsetX=4;ctx.shadowOffsetY=6;
+      ctx.drawImage(seal, sx-ss/2, sy-ss/2, ss, ss);
+      ctx.restore();
+    }
   }
 }
 
@@ -454,41 +616,63 @@ class DressUpScene extends Scene {
   }
   update(dt){if(this.tooltipTimer>0){this.tooltipTimer-=dt;if(this.tooltipTimer<=0)this.tooltip='';}}
   draw(){
-    fillRect(0,0,W,H,C.bg);strokeRect(12,12,W-24,H-24,C.rule,2,8);
+    drawParchmentBg();
+    // Title with shadow
     drawText(`Dress Up \u2014 ${this.species.charAt(0).toUpperCase()+this.species.slice(1)}`,W/2,28,C.text,font(48,true),'center','top');
-    const ruleY=82;drawLine(32,ruleY,W-32,ruleY,C.rule,2);
-    // Wardrobe
+    const ruleY=82;drawLine(60,ruleY,W-60,ruleY,C.rule,1.5);
+    // Wardrobe shelves
     for(const slot of SLOT_ORDER){
       const rr=this.slotRows[slot];
-      fillRect(rr.x,rr.y,rr.w,rr.h,C.shelfBg,8);fillRect(rr.x,rr.y,rr.w,4,C.shelfLight);fillRect(rr.x,rr.y+rr.h-6,rr.w,6,C.shelfDark,4);strokeRect(rr.x,rr.y,rr.w,rr.h,C.shelfEdge,2,8);
-      drawText(SLOT_LABELS[slot],rr.x+20,rr.y+rr.h/2,C.bg,font(26,true),'left','middle');
+      // Richer shelf gradient
+      const sg=ctx.createLinearGradient(rr.x,rr.y,rr.x,rr.y+rr.h);
+      sg.addColorStop(0,C.shelfLight);sg.addColorStop(0.15,C.shelfBg);sg.addColorStop(0.85,C.shelfBg);sg.addColorStop(1,C.shelfDark);
+      ctx.fillStyle=sg;ctx.beginPath();ctx.roundRect(rr.x,rr.y,rr.w,rr.h,8);ctx.fill();
+      strokeRect(rr.x,rr.y,rr.w,rr.h,C.shelfEdge,2,8);
+      // Slot label in brass badge
+      const lw=measureText(SLOT_LABELS[slot],font(22,true))+20,lh=28;
+      fillRect(rr.x+10,rr.y+rr.h/2-lh/2,lw,lh,'rgba(0,0,0,0.2)',4);
+      drawText(SLOT_LABELS[slot],rr.x+10+lw/2,rr.y+rr.h/2,C.bg,font(22,true),'center','middle');
+      // Item cards with shadow
       for(const a of(ACC_BY_SLOT[slot]||[])){
         const r=this.itemBtns[a.id],eq=this.equipped[slot]===a.id,hov=this.hoverItem===a.id;
-        fillRect(r.x,r.y,r.w,r.h,eq?C.panelHover:hov?'#fffaf0':C.panelBg,8);
-        strokeRect(r.x,r.y,r.w,r.h,eq?C.accent:hov?C.accentLight:C.panelBorder,eq?3:2,8);
-        // Draw thumbnail
+        if(eq||hov){
+          ctx.save();ctx.shadowColor='rgba(30,20,10,0.15)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
+          fillRect(r.x,r.y,r.w,r.h,eq?C.panelHover:hov?'#fffaf0':C.panelBg,8);
+          ctx.restore();
+        } else {
+          fillRect(r.x,r.y,r.w,r.h,C.panelBg,8);
+        }
+        if(eq){strokeRect(r.x-1,r.y-1,r.w+2,r.h+2,C.accentLight,2,9);strokeRect(r.x,r.y,r.w,r.h,C.accent,2.5,8);}
+        else strokeRect(r.x,r.y,r.w,r.h,hov?C.accentLight:C.panelBorder,hov?2:1.5,8);
         const img=this._getAccImg(a);
         if(img){const pad=16,md=r.w-pad*2,sc=Math.min(md/img.width,md/img.height),nw=img.width*sc,nh=img.height*sc;
           ctx.drawImage(img,r.x+r.w/2-nw/2,r.y+r.h/2-nh/2,nw,nh);}
         if(eq)fillCircle(r.x+r.w-10,r.y+10,6,C.accent);
       }
     }
-    // Character preview
+    // Character preview panel
+    const charX=620,avW=W-charX-32,anch=ANCHORS[this.species],pvH=520,pvScale=pvH/anch.h,pvW=Math.max(1,Math.round(anch.w*pvScale));
+    const ccx=charX+(avW-pvW)/2;
+    drawPanelWithShadow(ccx-20,ruleY+4,pvW+40,pvH+40,10,'rgba(236,226,208,0.5)');
+    drawCornerOrnaments(ccx-16,ruleY+8,pvW+32,pvH+32,18);
     this._drawCharacter(620,ruleY+16);
     // Equipped count
     const ec=Object.values(this.equipped).filter(v=>v).length;
-    const charX=620,avW=W-charX-32,anch=ANCHORS[this.species],pvH=520,pvScale=pvH/anch.h,pvW=Math.max(1,Math.round(anch.w*pvScale));
-    const ccx=charX+(avW-pvW)/2;
-    drawText(`${ec}/5 items equipped`,ccx+pvW/2,ruleY+16+pvH+8,C.textDim,font(26),'center','top');
+    drawText(`${ec}/5 items equipped`,ccx+pvW/2,ruleY+pvH+52,C.textDim,font(26),'center','top');
     // Buttons
     const ml={x:this.mx,y:this.my};
-    drawButton(this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h,'RESET',font(32,true),
-      inRect(ml.x,ml.y,this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h),'rgb(200,180,155)','rgb(180,155,125)');
-    drawButton(this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h,'Continue',font(32,true),
+    drawFancyButton(this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h,'RESET',font(28,true),
+      inRect(ml.x,ml.y,this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h));
+    drawFancyButton(this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h,'Continue',font(28,true),
       inRect(ml.x,ml.y,this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h));
-    drawButton(this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h,'Exit to Menu',font(32,true),
-      inRect(ml.x,ml.y,this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h),'rgb(210,195,172)','rgb(190,170,145)');
-    if(this.tooltip)drawText(this.tooltip,40,H-36,C.accentDark,font(26));
+    drawFancyButton(this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h,'Exit to Menu',font(28,true),
+      inRect(ml.x,ml.y,this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h));
+    // Tooltip as floating panel
+    if(this.tooltip){
+      const tw=measureText(this.tooltip,font(24))+32,th=36,tx=40,ty=H-50;
+      drawPanelWithShadow(tx,ty,tw,th,6,'#f5ebdc');
+      drawText(this.tooltip,tx+16,ty+th/2,C.accentDark,font(24),'left','middle');
+    }
   }
   _getAccImg(a){
     if(BODY_FITTED.has(a.slot))return IMAGES[a.sprite+'_'+this.species]||IMAGES[a.sprite]||null;
@@ -643,47 +827,79 @@ class DecisionScene extends Scene {
   }
   update(dt){this.fadeTimer+=dt;}
   draw(){
-    fillRect(0,0,W,H,C.bg);
+    drawParchmentBg();
     if(this.state==='envelope')this._drawEnvelope();else if(this.state==='revealed')this._drawRevealed();else this._drawSummary();
   }
   _drawEnvelope(){
     const cx=W/2,name=this.revealOrder[this.currentReveal];
-    drawText(`Decision ${this.currentReveal+1} of ${this.revealOrder.length}`,cx,60,C.textDim,font(32),'center','top');
-    drawText('Decision Letter',cx,130,C.accentDark,font(52,true),'center','middle');
-    const ex=cx-260,ey=H/2-170,ew=520,eh=300;
-    fillRect(ex,ey,ew,eh,'rgb(235,220,195)',8);strokeRect(ex,ey,ew,eh,C.accent,3,8);
-    // Flap
-    ctx.fillStyle='rgb(225,210,185)';ctx.beginPath();ctx.moveTo(ex+4,ey+4);ctx.lineTo(cx,ey+eh/2-40);ctx.lineTo(ex+ew-4,ey+4);ctx.closePath();ctx.fill();
-    ctx.strokeStyle=C.accent;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ex+4,ey+4);ctx.lineTo(cx,ey+eh/2-40);ctx.lineTo(ex+ew-4,ey+4);ctx.stroke();
-    // Seal
-    fillCircle(cx,ey+eh/2-40,28,C.accent);strokeCircle(cx,ey+eh/2-40,28,C.accentDark,3);
-    drawText('H',cx,ey+eh/2-40,C.bg,font(26),'center','middle');
-    drawText(name,cx,ey+eh/2+30,C.text,font(34,true),'center','middle');
-    drawText('Click to open',cx,ey+eh+40,C.textLight,font(32),'center','middle');
+    drawText(`Decision ${this.currentReveal+1} of ${this.revealOrder.length}`,cx,50,C.textDim,font(30),'center','top');
+    drawText('Decision Letter',cx,120,C.accentDark,font(52,true),'center','middle');
+    drawOrnamentalDivider(cx,160,500);
+    // Envelope with shadow
+    const ex=cx-280,ey=H/2-180,ew=560,eh=320;
+    ctx.save();ctx.shadowColor='rgba(20,10,5,0.3)';ctx.shadowBlur=20;ctx.shadowOffsetY=8;
+    // Envelope gradient
+    const eg=ctx.createLinearGradient(ex,ey,ex,ey+eh);
+    eg.addColorStop(0,'rgb(240,228,205)');eg.addColorStop(1,'rgb(218,200,172)');
+    ctx.fillStyle=eg;ctx.beginPath();ctx.roundRect(ex,ey,ew,eh,10);ctx.fill();
+    ctx.restore();
+    strokeRect(ex,ey,ew,eh,C.accent,2.5,10);
+    // Inner fold lines
+    ctx.save();ctx.globalAlpha=0.12;ctx.strokeStyle=C.accent;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(ex+8,ey+eh-8);ctx.lineTo(cx,ey+eh/2+20);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ex+ew-8,ey+eh-8);ctx.lineTo(cx,ey+eh/2+20);ctx.stroke();
+    ctx.restore();
+    // Flap with gradient
+    const fg=ctx.createLinearGradient(cx,ey,cx,ey+eh/2-30);
+    fg.addColorStop(0,'rgb(230,216,190)');fg.addColorStop(1,'rgb(218,202,175)');
+    ctx.fillStyle=fg;ctx.beginPath();ctx.moveTo(ex+6,ey+6);ctx.lineTo(cx,ey+eh/2-30);ctx.lineTo(ex+ew-6,ey+6);ctx.closePath();ctx.fill();
+    ctx.strokeStyle=C.accent;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ex+6,ey+6);ctx.lineTo(cx,ey+eh/2-30);ctx.lineTo(ex+ew-6,ey+6);ctx.stroke();
+    // Wax seal on envelope
+    const seal=IMAGES['wax_seal'];
+    if(seal){const ss=90;ctx.save();ctx.shadowColor='rgba(20,10,5,0.3)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;
+      ctx.drawImage(seal,cx-ss/2,ey+eh/2-30-ss/2,ss,ss);ctx.restore();}
+    else{fillCircle(cx,ey+eh/2-30,28,C.accent);strokeCircle(cx,ey+eh/2-30,28,C.accentDark,3);drawText('H',cx,ey+eh/2-30,C.bg,font(26),'center','middle');}
+    // College name
+    drawText(name,cx,ey+eh/2+40,C.text,font(34,true),'center','middle');
+    // Pulsing "Click to open"
+    const pulse=0.5+0.5*Math.sin(this.fadeTimer*3);
+    ctx.save();ctx.globalAlpha=0.4+pulse*0.6;
+    drawText('Click to open',cx,ey+eh+50,C.textLight,font(30),'center','middle');
+    ctx.restore();
   }
   _drawRevealed(){
     const cx=W/2,name=this.revealOrder[this.currentReveal],result=this.decisions[name];
     const rc={accepted:C.accept,waitlisted:C.waitlist,rejected:C.reject};
     const rl={accepted:'ACCEPTED',waitlisted:'WAITLISTED',rejected:'REJECTED'};
-    drawText(name,cx,50,C.textDim,font(32),'center','top');drawLine(160,84,W-160,84,C.rule,2);
-    drawText(rl[result],cx,130,rc[result],font(52,true),'center','middle');
-    // Find letter
+    // College name header
+    drawText(name,cx,50,C.textDim,font(32),'center','top');
+    drawOrnamentalDivider(cx,90,600);
+    // Result as pill badge
+    drawResultPill(cx,140,rl[result],rc[result]);
+    // Letter panel
     let cid=null;for(const c of COLLEGES)if(c.name===name){cid=c.id;break;}
     let letter='';if(result==='accepted')letter=ACCEPTANCE_LETTERS[cid]||'You have been accepted.';
     else if(result==='waitlisted')letter=WAITLIST_LETTERS[cid]||'You have been waitlisted.';
     else letter=REJECTION_LETTERS[cid]||'We regret to inform you\u2026';
-    const lines=wrapText(letter,font(32),W-240);let y=210;for(const l of lines){drawText(l,120,y,C.text,font(32));y+=36;}
-    drawButton(W/2-160,H-154,320,68,'Continue',font(34,true),false);
+    const lines=wrapText(letter,font(30),W-320);
+    const lh=lines.length*34+40;
+    drawPanelWithShadow(120,190,W-240,lh,10,'rgba(245,235,220,0.7)');
+    let y=210;for(const l of lines){drawText(l,140,y,C.text,font(30));y+=34;}
+    // Continue button
+    drawFancyButton(W/2-160,H-140,320,64,'Continue',font(30,true),false);
   }
   _drawSummary(){
     const cx=W/2,rc={accepted:C.accept,waitlisted:C.waitlist,rejected:C.reject},rl={accepted:'ACCEPTED',waitlisted:'WAITLISTED',rejected:'REJECTED'};
-    drawText('Admissions Summary',cx,90,C.accentDark,font(52,true),'center','middle');drawLine(200,140,W-200,140,C.rule,2);
-    let y=180;for(const[name,result]of Object.entries(this.decisions)){
-      drawText(name,160,y,C.text,font(34,true));
-      drawText(rl[result],W-160,y,rc[result],font(34,true),'right','top');
-      drawLine(160,y+44,W-160,y+44,C.rule,2);y+=80;}
-    drawText('All decisions reflect our commitment to institutional excellence.',cx,y+40,C.textLight,font(26),'center','top');
-    drawButton(W/2-160,H-154,320,68,'View Your Profile',font(34,true),false);
+    drawText('Admissions Summary',cx,70,C.accentDark,font(48,true),'center','middle');
+    drawOrnamentalDivider(cx,110,600);
+    // Decision cards
+    let y=150;for(const[name,result]of Object.entries(this.decisions)){
+      drawPanelWithShadow(160,y,W-320,80,8,'rgba(245,235,220,0.6)');
+      drawText(name,200,y+40,C.text,font(32,true),'left','middle');
+      drawResultPill(W-240,y+40,rl[result],rc[result]);
+      y+=100;}
+    drawText('All decisions reflect our commitment to institutional excellence.',cx,y+30,C.textLight,font(24,false,true),'center','top');
+    drawFancyButton(W/2-160,H-140,320,64,'View Your Profile',font(30,true),false);
   }
 }
 
@@ -704,34 +920,65 @@ class ExportScene extends Scene {
   _payload(){return{game:'HYBRIS: Create Your Applicant',version:'1.0',character:{species:this.persistent.species,profile:this.persistent.profile,profile_label:this.persistent.profile_label,equipped_accessories:this.persistent.equipped_accessories},stats:this.stats,applications:this.persistent.applications,decisions:this.persistent.decisions,meta:{quiz_answers:this.persistent.quiz_answers,cosmetic_tags:this.persistent.cosmetic_tags}};}
   update(dt){if(this.saveMsgTimer>0){this.saveMsgTimer-=dt;if(this.saveMsgTimer<=0)this.saveMsg='';}}
   draw(){
-    fillRect(0,0,W,H,C.bg);const cx=W/2;
-    drawLine(120,32,W-120,32,C.rule,2);drawText('Applicant Dossier',cx,60,C.accentDark,font(48,true),'center','middle');
-    drawLine(120,100,W-120,100,C.rule,2);
-    drawText(`${(this.persistent.species||'?').charAt(0).toUpperCase()+(this.persistent.species||'?').slice(1)}  \u00b7  ${this.persistent.profile_label||'?'}`,cx,124,C.text,font(32,true),'center','middle');
-    // Stat bars
+    drawParchmentBg();const cx=W/2;
+    // Header
+    drawOrnamentalDivider(cx,32,700);
+    drawText('Applicant Dossier',cx,68,C.accentDark,font(48,true),'center','middle');
+    drawOrnamentalDivider(cx,104,700);
+    // Profile badge
+    const profText=`${(this.persistent.species||'?').charAt(0).toUpperCase()+(this.persistent.species||'?').slice(1)}  \u00b7  ${this.persistent.profile_label||'?'}`;
+    const profW=measureText(profText,font(28,true))+40,profH=36;
+    drawPanelWithShadow(cx-profW/2,118,profW,profH,profH/2,'#ece2d0');
+    drawText(profText,cx,118+profH/2,C.text,font(28,true),'center','middle');
+    // Stat bars — left column in panel
     const STAT_COLORS={money:'rgb(180,155,50)',connections:'rgb(70,130,170)',time:'rgb(120,160,80)',stress:'rgb(175,80,65)',reputation:'rgb(140,110,180)',integrity:'rgb(80,160,130)'};
     const STAT_ORDER=['money','connections','time','stress','reputation','integrity'];
-    let bx=100,bw=440,bh=32,y=180;
+    drawPanelWithShadow(60,170,600,530,10,'rgba(236,226,208,0.4)');
+    drawText('Assessment Metrics',80,192,C.accentDark,font(28,true));
+    drawLine(80,216,640,216,C.rule,1);
+    let bx=80,bw=520,bh=28,y=238;
     for(const sk of STAT_ORDER){const v=this.stats[sk]||0,c=STAT_COLORS[sk];
-      drawText(sk.charAt(0).toUpperCase()+sk.slice(1),bx,y,c,font(32,true));drawText(String(v),bx+bw+16,y+4,C.textDim,font(30));
-      const by=y+36;fillRect(bx,by,bw,bh,C.panelBorder,6);const fw=Math.round(bw*v/100);if(fw>0)fillRect(bx,by,fw,bh,c,6);y+=84;}
-    // Right column
-    let dx=740,dy=180;
-    drawText('Decisions',dx,dy,C.accentDark,font(32,true));drawLine(dx,dy+32,dx+400,dy+32,C.rule,2);dy+=48;
+      drawStatBarFancy(bx,y,bw,bh,v,c,sk.charAt(0).toUpperCase()+sk.slice(1));
+      y+=76;}
+    // Right column — Decisions panel
+    let dx=700,dy=170;
+    drawPanelWithShadow(dx,dy,520,220,10,'rgba(236,226,208,0.4)');
+    drawText('Decisions',dx+20,dy+24,C.accentDark,font(28,true));
+    drawLine(dx+20,dy+46,dx+500,dy+46,C.rule,1);
+    dy+=60;
     const rc={accepted:C.accept,waitlisted:C.waitlist,rejected:C.reject};
     for(const[name,result]of Object.entries(this.persistent.decisions||{})){
-      drawText(name,dx,dy,C.textDim,font(30));dy+=28;drawText(result.toUpperCase(),dx+24,dy,rc[result]||C.text,font(30));dy+=44;}
-    dy+=16;drawText('Accessories',dx,dy,C.accentDark,font(32,true));drawLine(dx,dy+32,dx+400,dy+32,C.rule,2);dy+=44;
+      drawText(name,dx+20,dy,C.textDim,font(26));
+      drawResultPill(dx+440,dy+8,result.toUpperCase(),rc[result]||C.text);
+      dy+=50;}
+    // Accessories panel
+    const ay=410;
+    drawPanelWithShadow(700,ay,520,200,10,'rgba(236,226,208,0.4)');
+    drawText('Accessories',720,ay+24,C.accentDark,font(28,true));
+    drawLine(720,ay+46,1200,ay+46,C.rule,1);
+    let ady=ay+60;
     for(const[slot,aid]of Object.entries(this.persistent.equipped_accessories||{})){
-      const disp=aid?aid.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'\u2014';
-      drawText(`${slot.charAt(0).toUpperCase()+slot.slice(1)}: ${disp}`,dx,dy,C.textDim,font(26));dy+=32;}
-    dy+=16;const tags=this.persistent.cosmetic_tags||{};
-    drawText(`Tags: W:${tags.wealth||0}  S:${tags.striving||0}  R:${tags.rebellion||0}`,dx,dy,C.textLight,font(26));
+      const disp=aid?ACC_LOOKUP[aid].name:'\u2014';
+      drawText(`${slot.charAt(0).toUpperCase()+slot.slice(1)}:`,720,ady,C.textLight,font(24));
+      drawText(disp,820,ady,C.textDim,font(24));ady+=28;}
+    // Tags as pills
+    const tags=this.persistent.cosmetic_tags||{};
+    ady+=8;
+    const tagData=[{l:'W',v:tags.wealth||0,c:'#b08820'},{l:'S',v:tags.striving||0,c:'#5a8a50'},{l:'R',v:tags.rebellion||0,c:'#a04030'}];
+    let tx=720;for(const t of tagData){
+      const tl=`${t.l}:${t.v}`,tw=measureText(tl,font(22,true))+16,th=26;
+      fillRect(tx,ady,tw,th,t.c,th/2);drawText(tl,tx+tw/2,ady+th/2,'#fff',font(22,true),'center','middle');
+      tx+=tw+10;}
     // Buttons
-    drawButton(60,H-150,260,60,'Save Local',font(32,true),false);
-    drawButton(340,H-150,260,60,'Export JSON',font(32,true),false);
-    drawButton(W-320,H-150,260,60,'Main Menu',font(32,true),false);
-    if(this.saveMsg)drawText(this.saveMsg,60,H-180,C.accept,font(30));
+    drawFancyButton(60,H-130,260,56,'Save Local',font(26,true),false);
+    drawFancyButton(340,H-130,260,56,'Export JSON',font(26,true),false);
+    drawFancyButton(W-320,H-130,260,56,'Main Menu',font(26,true),false);
+    // Save toast
+    if(this.saveMsg){
+      const smw=measureText(this.saveMsg,font(24))+32,smh=34;
+      drawPanelWithShadow(60,H-170,smw,smh,6,'#e8f0e0');
+      drawText(this.saveMsg,76,H-170+smh/2,C.accept,font(24),'left','middle');
+    }
   }
 }
 
