@@ -1,3 +1,4 @@
+import asyncio
 import pygame
 from src.game import Game
 from src.settings import WINDOW_WIDTH, WINDOW_HEIGHT
@@ -10,9 +11,10 @@ from src.scenes.decision import DecisionScene
 from src.scenes.export import ExportScene
 
 
-def main():
+async def main():
     pygame.init()
-    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+    info = pygame.display.Info()
+    screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.RESIZABLE)
     pygame.display.set_caption("HYBRIS: Create Your Applicant")
 
     scenes = {
@@ -26,9 +28,9 @@ def main():
     }
 
     game = Game(screen, scenes, "MAIN_MENU")
-    game.run()
+    await game.run()
     pygame.quit()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

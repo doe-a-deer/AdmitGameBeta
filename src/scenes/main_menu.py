@@ -1,5 +1,6 @@
 import pygame
 from src.scene import Scene
+from src.font_loader import get_font
 from src.settings import (
     LOGICAL_WIDTH, LOGICAL_HEIGHT, COLOR_BG, COLOR_TEXT, COLOR_TEXT_DIM,
     COLOR_TEXT_LIGHT, COLOR_ACCENT, COLOR_ACCENT_DARK, COLOR_BUTTON_IDLE,
@@ -20,14 +21,14 @@ class MainMenuScene(Scene):
 
     def startup(self, persistent):
         super().startup(persistent)
-        self.title_font = pygame.font.SysFont("Georgia", 36, bold=True)
-        self.subtitle_font = pygame.font.SysFont("Georgia", 16, italic=True)
-        self.button_font = pygame.font.SysFont("Georgia", 15)
-        self.small_font = pygame.font.SysFont("Georgia", 11)
-        self.start_rect = pygame.Rect(0, 0, 200, 42)
-        self.start_rect.center = (LOGICAL_WIDTH // 2, 270)
-        self.quit_rect = pygame.Rect(0, 0, 200, 42)
-        self.quit_rect.center = (LOGICAL_WIDTH // 2, 330)
+        self.title_font = get_font(72, bold=True)
+        self.subtitle_font = get_font(32, italic=True)
+        self.button_font = get_font(28, bold=True)
+        self.small_font = get_font(22)
+        self.start_rect = pygame.Rect(0, 0, 400, 84)
+        self.start_rect.center = (LOGICAL_WIDTH // 2, 540)
+        self.quit_rect = pygame.Rect(0, 0, 400, 84)
+        self.quit_rect.center = (LOGICAL_WIDTH // 2, 660)
         self.hovered = None
 
     def handle_events(self, events):
@@ -62,25 +63,25 @@ class MainMenuScene(Scene):
         cx = LOGICAL_WIDTH // 2
 
         # Decorative top rule with diamond ornament
-        pygame.draw.line(surface, COLOR_RULE_LINE, (80, 60), (LOGICAL_WIDTH - 80, 60), 1)
-        pts = [(cx, 56), (cx + 4, 60), (cx, 64), (cx - 4, 60)]
+        pygame.draw.line(surface, COLOR_RULE_LINE, (160, 120), (LOGICAL_WIDTH - 160, 120), 2)
+        pts = [(cx, 112), (cx + 8, 120), (cx, 128), (cx - 8, 120)]
         pygame.draw.polygon(surface, COLOR_ACCENT, pts)
 
         # Title
         title = self.title_font.render("HYBRIS", True, COLOR_ACCENT_DARK)
-        surface.blit(title, title.get_rect(center=(cx, 110)))
+        surface.blit(title, title.get_rect(center=(cx, 220)))
 
         # Subtitle
         sub = self.subtitle_font.render("Create Your Applicant", True, COLOR_TEXT_DIM)
-        surface.blit(sub, sub.get_rect(center=(cx, 150)))
+        surface.blit(sub, sub.get_rect(center=(cx, 300)))
 
         # Rule
-        pygame.draw.line(surface, COLOR_RULE_LINE, (160, 175), (LOGICAL_WIDTH - 160, 175), 1)
+        pygame.draw.line(surface, COLOR_RULE_LINE, (320, 350), (LOGICAL_WIDTH - 320, 350), 2)
 
         # Tagline
         tag = self.small_font.render(
             "A holistic assessment of your potential.", True, COLOR_TEXT_LIGHT)
-        surface.blit(tag, tag.get_rect(center=(cx, 200)))
+        surface.blit(tag, tag.get_rect(center=(cx, 400)))
 
         # Buttons
         self._draw_button(surface, self.start_rect, "Begin Assessment", self.hovered == "start")
@@ -88,10 +89,10 @@ class MainMenuScene(Scene):
 
         # Footer
         pygame.draw.line(surface, COLOR_RULE_LINE,
-                         (80, LOGICAL_HEIGHT - 60), (LOGICAL_WIDTH - 80, LOGICAL_HEIGHT - 60), 1)
+                         (160, LOGICAL_HEIGHT - 120), (LOGICAL_WIDTH - 160, LOGICAL_HEIGHT - 120), 2)
         footer = self.small_font.render(
             "v1.0  \u00b7  Institutional Review Pending", True, COLOR_TEXT_LIGHT)
-        surface.blit(footer, footer.get_rect(center=(cx, LOGICAL_HEIGHT - 42)))
+        surface.blit(footer, footer.get_rect(center=(cx, LOGICAL_HEIGHT - 84)))
 
     def _draw_button(self, surface, rect, text, hovered):
         bg = COLOR_BUTTON_HOVER if hovered else COLOR_BUTTON_IDLE

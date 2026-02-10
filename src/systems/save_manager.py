@@ -1,13 +1,18 @@
 import json
-from pathlib import Path
+import sys
+import os
 from datetime import datetime
 from src.settings import SAVES_DIR, EXPORTS_DIR
+
+IS_WEB = sys.platform == "emscripten"
 
 
 def save_local(persistent, filename="character_save.json"):
     """Save character data to the local saves/ directory."""
-    SAVES_DIR.mkdir(exist_ok=True)
-    path = SAVES_DIR / filename
+    if IS_WEB:
+        return None
+    os.makedirs(SAVES_DIR, exist_ok=True)
+    path = os.path.join(SAVES_DIR, filename)
     with open(path, "w") as f:
         json.dump(_build_payload(persistent), f, indent=2)
     return path
@@ -15,12 +20,14 @@ def save_local(persistent, filename="character_save.json"):
 
 def export_downloadable(persistent, filename=None):
     """Export character data to the exports/ directory."""
-    EXPORTS_DIR.mkdir(exist_ok=True)
+    if IS_WEB:
+        return None
+    os.makedirs(EXPORTS_DIR, exist_ok=True)
     if filename is None:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         species = persistent.get("species", "unknown")
         filename = f"hybris_{species}_{ts}.json"
-    path = EXPORTS_DIR / filename
+    path = os.path.join(EXPORTS_DIR, filename)
     with open(path, "w") as f:
         json.dump(_build_payload(persistent), f, indent=2)
     return path

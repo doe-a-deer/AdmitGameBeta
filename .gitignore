@@ -13,5 +13,8 @@ venv/
 saves/
 exports/
 
+# Pygbag build artifacts
+build/
+
 # Claude
 .claude/

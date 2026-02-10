@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HYBRIS: Create Your Applicant</title>
+<style>
+@font-face { font-family:'EB Garamond'; src:url('assets/fonts/EBGaramond-Regular.ttf') format('truetype'); font-weight:400; font-style:normal; }
+@font-face { font-family:'EB Garamond'; src:url('assets/fonts/EBGaramond-Bold.ttf') format('truetype'); font-weight:700; font-style:normal; }
+@font-face { font-family:'EB Garamond'; src:url('assets/fonts/EBGaramond-Italic.ttf') format('truetype'); font-weight:400; font-style:italic; }
+@font-face { font-family:'EB Garamond'; src:url('assets/fonts/EBGaramond-BoldItalic.ttf') format('truetype'); font-weight:700; font-style:italic; }
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#3a3028;}
+#game-container{display:flex;align-items:center;justify-content:center;width:100vw;height:100vh;-webkit-font-smoothing:antialiased;}
+canvas{display:block;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+#text-input{position:absolute;left:-9999px;top:-9999px;opacity:0;font-family:'EB Garamond';font-size:16px;}
+#loading{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f5ebdc;font-family:'EB Garamond',Georgia,serif;color:#6a4114;}
+#loading h1{font-size:48px;margin-bottom:20px;}
+#loading-bar-bg{width:300px;height:20px;background:#d4c4a8;border-radius:10px;overflow:hidden;}
+#loading-bar{width:0%;height:100%;background:#8c5a1e;border-radius:10px;transition:width 0.2s;}
+#loading-text{margin-top:12px;font-size:18px;color:#8a7660;}
+</style>
+</head>
+<body>
+<div id="game-container">
+<canvas id="game" width="1280" height="960"></canvas>
+</div>
+<input id="text-input" type="text" maxlength="200" autocomplete="off">
+<div id="loading">
+<h1>HYBRIS</h1>
+<div id="loading-bar-bg"><div id="loading-bar"></div></div>
+<div id="loading-text">Loading assets...</div>
+</div>
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  HYBRIS: Create Your Applicant — Web Version
+// ══════════════════════════════════════════════════════════════════
+
+const W = 1280, H = 960;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const textInput = document.getElementById('text-input');
+
+// ── HiDPI / Retina sharpness ────────────────────────────────────
+// Strategy: render at W*dpr × H*dpr backing pixels, scale with clean integer DPR,
+// let CSS object-fit handle viewport fitting. This gives 1:1 pixel text at the
+// native device resolution and avoids fractional scale factors.
+function setupCanvas() {
+  const dpr = Math.round(window.devicePixelRatio || 1);
+  // Backing buffer at clean integer multiple of logical resolution
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  // CSS: let the browser fit the canvas into the viewport at 4:3
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const scale = Math.min(vw / W, vh / H);
+  canvas.style.width  = Math.round(W * scale) + 'px';
+  canvas.style.height = Math.round(H * scale) + 'px';
+  // Clean integer scale so text renders at native DPR resolution
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+}
+setupCanvas();
+window.addEventListener('resize', setupCanvas);
+
+// ── Colors ──────────────────────────────────────────────────────
+const C = {
+  bg: '#f5ebdc', bgAlt: '#e8dcc8', bgDark: '#3a3028',
+  text: '#23190f', textDim: '#554637', textLight: '#786953',
+  accent: '#8c5a1e', accentDark: '#644114', accentLight: '#c4975a',
+  panelBg: '#ece2d0', panelBorder: '#af9b82', panelHover: '#f0e8d8',
+  btnIdle: '#c0a87a', btnHover: '#a8905e', btnText: '#3a2810',
+  rule: '#a08c73',
+  accept: '#5a8a50', reject: '#a04030', waitlist: '#b08820',
+  shelfBg: '#b99169', shelfDark: '#916e4b', shelfLight: '#d2af87', shelfEdge: '#785537',
+};
+
+// ── Fonts ───────────────────────────────────────────────────────
+function font(size, bold=false, italic=false) {
+  return `${italic?'italic ':''}${bold?'700':'400'} ${size}px "EB Garamond", Georgia, serif`;
+}
+
+// ── Drawing Helpers ─────────────────────────────────────────────
+function fillRect(x,y,w,h,color,r=0) {
+  ctx.fillStyle=color;
+  if(r>0){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+  else ctx.fillRect(x,y,w,h);
+}
+function strokeRect(x,y,w,h,color,lw=1,r=0) {
+  ctx.strokeStyle=color;ctx.lineWidth=lw;
+  if(r>0){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.stroke();}
+  else ctx.strokeRect(x,y,w,h);
+}
+function drawLine(x1,y1,x2,y2,color,lw=2) {
+  ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+}
+function fillCircle(cx,cy,r,color) {
+  ctx.fillStyle=color;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+}
+function strokeCircle(cx,cy,r,color,lw=2) {
+  ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+}
+function drawText(text,x,y,color,f,align='left',baseline='top') {
+  ctx.font=f;ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline=baseline;
+  // Pixel-snap coordinates for crisp text
+  ctx.fillText(text,Math.round(x),Math.round(y));
+}
+function measureText(text,f) { ctx.font=f; return ctx.measureText(text).width; }
+function wrapText(text,f,maxW) {
+  ctx.font=f; const words=text.split(' '),lines=[]; let cur='';
+  for(const w of words){const t=cur?(cur+' '+w):w;if(ctx.measureText(t).width<=maxW)cur=t;else{if(cur)lines.push(cur);cur=w;}}
+  if(cur)lines.push(cur); return lines.length?lines:[''];
+}
+function drawButton(x,y,w,h,text,f,hover,idleC=C.btnIdle,hoverC=C.btnHover) {
+  fillRect(x,y,w,h,hover?hoverC:idleC,8);strokeRect(x,y,w,h,C.panelBorder,2,8);
+  drawText(text,x+w/2,y+h/2,C.btnText,f,'center','middle');
+}
+function inRect(mx,my,x,y,w,h){return mx>=x&&mx<=x+w&&my>=y&&my<=y+h;}
+function steppedProgress(timer,duration){
+  const t=timer/duration;
+  if(t<0.3)return t/0.3*0.33;if(t<0.45)return 0.33;if(t<0.65)return 0.33+(t-0.45)/0.2*0.33;
+  if(t<0.8)return 0.66;return Math.min(1,0.66+(t-0.8)/0.2*0.34);
+}
+
+// ── Data ────────────────────────────────────────────────────────
+const QUESTIONS=[
+  {id:"family_wealth",text:"Growing up, your family\u2019s relationship with money was best described as...",answers:[
+    {text:"Comfortable \u2014 we never really talked about it.",scores:{capital:3,grit:0,performance:0}},
+    {text:"Careful \u2014 every dollar had a plan.",scores:{capital:0,grit:3,performance:1}},
+    {text:"Creative \u2014 we made it work, always.",scores:{capital:0,grit:2,performance:2}},
+    {text:"Complicated \u2014 let\u2019s just say it fluctuated.",scores:{capital:1,grit:1,performance:1}}]},
+  {id:"parental_education",text:"When your parents discuss their college years, they...",answers:[
+    {text:"Reference their alma mater\u2019s traditions fondly.",scores:{capital:3,grit:0,performance:1}},
+    {text:"Talk about what they wish they\u2019d had the chance to do.",scores:{capital:0,grit:3,performance:1}},
+    {text:"Don\u2019t, really. College wasn\u2019t part of their story.",scores:{capital:0,grit:2,performance:2}},
+    {text:"Emphasize how hard they worked to get there.",scores:{capital:1,grit:2,performance:2}}]},
+  {id:"school_type",text:"Your high school experience could best be summarized as...",answers:[
+    {text:"Small classes, big expectations, strong alumni network.",scores:{capital:3,grit:0,performance:1}},
+    {text:"Overcrowded but full of resourceful people.",scores:{capital:0,grit:2,performance:2}},
+    {text:"A place where you had to prove yourself every single day.",scores:{capital:0,grit:1,performance:3}},
+    {text:"Fine. Normal. Nothing remarkable.",scores:{capital:1,grit:1,performance:1}}]},
+  {id:"specialization",text:"Do you prefer to be exceptional @ 1 thing or competent @ many?",answers:[
+    {text:"Exceptional @ 1 thing \u2014 depth over breadth.",scores:{capital:0,grit:0,performance:3}},
+    {text:"Competent @ many \u2014 versatility is survival.",scores:{capital:0,grit:3,performance:0}},
+    {text:"Whichever one looks best on a resume.",scores:{capital:2,grit:0,performance:2}},
+    {text:"I never got to choose \u2014 I do what\u2019s needed.",scores:{capital:0,grit:3,performance:1}}]}
+];
+
+const COLLEGES=[
+  {id:"princesstown",name:"Princesstown University",motto:"Tradition. Refinement. Civilizational Inheritance.",tagline:"Where effortlessness is a moral category.",bias:{capital:1.5,grit:0.5,performance:0.8},
+   essayPrompts:["Describe the tradition that most shaped your sense of belonging.","How has your upbringing prepared you to steward something larger than yourself?"],
+   extracurriculars:["Formal Hall Committee","The Punting Society","Chapel Choir","Debating Union","May Ball Planning Board"]},
+  {id:"cit",name:"California Institute of Technology",motto:"Disrupt. Build. Transcend.",tagline:"Where impact is a moral category.",bias:{capital:0.8,grit:0.8,performance:1.5},
+   essayPrompts:["Tell us about something you built and the problem it solved.","How will your trajectory create measurable change in the world?"],
+   extracurriculars:["Startup Incubator","Impact Ventures Club","Plaza Organizing Coalition","Lab Rush Team","Demo Day Speaker Circuit"]},
+  {id:"yale_state",name:"Yale State Polytechnic Institute",motto:"Selection. Excellence. Sovereign Prestige.",tagline:"Where seriousness is a moral category.",bias:{capital:1.2,grit:1.0,performance:1.0},
+   essayPrompts:["Describe a sacrifice you made in pursuit of something you believed in.","How has your background prepared you for the weight of institutional expectation?"],
+   extracurriculars:["The Committee Circuit","Fellowship Pipeline Seminar","Housing Sort Orientation","Donor Relations Board","Closed Door Reading Group"]}
+];
+const COLLEGE_LOOKUP=Object.fromEntries(COLLEGES.map(c=>[c.id,c]));
+
+const ACCESSORIES=[
+  {id:"hat_graduation",name:"Mortarboard",slot:"hat",sprite:"hat_graduation",tags:{wealth:2,striving:0,rebellion:0},flavor:"Inherited, naturally. One does not earn a hat like this."},
+  {id:"hat_cap",name:"Baseball Cap",slot:"hat",sprite:"hat_cap",tags:{wealth:0,striving:2,rebellion:0},flavor:"Clean lines. Team player energy. Interview-ready."},
+  {id:"hat_beanie",name:"Slouch Beanie",slot:"hat",sprite:"hat_beanie",tags:{wealth:0,striving:0,rebellion:2},flavor:"Pulled low enough to obscure institutional expectations."},
+  {id:"glasses_wire",name:"Gold Rounds",slot:"glasses",sprite:"glasses_wire",tags:{wealth:2,striving:0,rebellion:0},flavor:"Prescription optional. Prestige mandatory."},
+  {id:"glasses_rect",name:"Square Frames",slot:"glasses",sprite:"glasses_rect",tags:{wealth:0,striving:2,rebellion:0},flavor:"Functional. Serious. Seen in every fellowship photo."},
+  {id:"glasses_dark",name:"Dark Shades",slot:"glasses",sprite:"glasses_dark",tags:{wealth:0,striving:0,rebellion:2},flavor:"Sees the cracks in everything, stylishly."},
+  {id:"neck_medallion",name:"Gold Medallion",slot:"neck",sprite:"neck_medallion",tags:{wealth:2,striving:0,rebellion:0},flavor:"A family crest, or close enough to one."},
+  {id:"neck_bowtie",name:"The Bowtie",slot:"neck",sprite:"neck_bowtie",tags:{wealth:0,striving:2,rebellion:0},flavor:"Tied with the precision of a scholarship application."},
+  {id:"neck_pin",name:"Safety Pin",slot:"neck",sprite:"neck_pin",tags:{wealth:0,striving:0,rebellion:2},flavor:"Holds things together when institutions won\u2019t."},
+  {id:"top_blazer",name:"Crimson Blazer",slot:"top",sprite:"top_blazer",tags:{wealth:2,striving:0,rebellion:0},flavor:"Understated. Which is the most expensive statement."},
+  {id:"top_hoodie",name:"Grey Hoodie",slot:"top",sprite:"top_hoodie",tags:{wealth:0,striving:2,rebellion:0},flavor:"Clean. Simple. Interview-adjacent."},
+  {id:"top_band",name:"Band Tee",slot:"top",sprite:"top_band",tags:{wealth:0,striving:0,rebellion:2},flavor:"The color of things that cannot be ignored."},
+  {id:"bottoms_trousers",name:"Pressed Trousers",slot:"bottoms",sprite:"bottoms_trousers",tags:{wealth:2,striving:0,rebellion:0},flavor:"Pristine. Dry-clean only. Someone else does the cleaning."},
+  {id:"bottoms_jeans",name:"Clean Jeans",slot:"bottoms",sprite:"bottoms_jeans",tags:{wealth:0,striving:2,rebellion:0},flavor:"Practical. Durable. Worn to every obligation."},
+  {id:"bottoms_punk",name:"Plaid Skirt",slot:"bottoms",sprite:"bottoms_punk",tags:{wealth:0,striving:0,rebellion:2},flavor:"Tartan by choice, not tradition. There\u2019s a difference."},
+];
+const ACC_LOOKUP=Object.fromEntries(ACCESSORIES.map(a=>[a.id,a]));
+const ACC_BY_SLOT={};ACCESSORIES.forEach(a=>(ACC_BY_SLOT[a.slot]??=[]).push(a));
+const SLOT_ORDER=["hat","glasses","neck","top","bottoms"];
+const SLOT_LABELS={hat:"HATS",glasses:"EYES",neck:"NECK",top:"SHIRTS",bottoms:"BOTTOMS"};
+const BODY_FITTED=new Set(["top","bottoms"]);
+const STANDALONE=new Set(["hat","glasses","neck"]);
+
+const ANCHORS={
+  fox:{eye_cx:307,eye_cy:235,neck_y:368,w:522,h:609},
+  dog:{eye_cx:227,eye_cy:190,neck_y:310,w:447,h:548},
+  cat:{eye_cx:176,eye_cy:222,neck_y:356,w:365,h:587},
+};
+
+const ACCEPTANCE_LETTERS={
+  princesstown:"The Master and Fellows of your assigned College are pleased to inform you that a place has been reserved in your name. We trust you will carry this appointment with the discretion it implies.",
+  cit:"After a trajectory-aware review of your application, the Office of Impact Admissions is thrilled to welcome you to CIT. Your profile signals the kind of builder energy we invest in.",
+  yale_state:"The Committee on Holistic Admissions has completed its deliberation. After reviewing your dossier, we are prepared to extend an offer of enrollment. This decision is final and reflects our institutional values."
+};
+const WAITLIST_LETTERS={
+  princesstown:"Your application has been noted with interest. The Committee has placed you on the Provisional Consideration Register. We suggest you continue to cultivate the qualities we value, quietly and without presumption.",
+  cit:"Your application shows promising trajectory indicators, but we need additional signal. You have been placed on the Momentum Waitpool. We encourage you to keep building and check back when your impact story has matured.",
+  yale_state:"Your dossier remains under active deliberation. You have been placed on the Extended Review List. We cannot disclose the criteria under evaluation, but we encourage patience and continued seriousness of purpose."
+};
+const REJECTION_LETTERS={
+  princesstown:"After careful consideration, the College is unable to offer you a place at this time. We trust you will find an institution better suited to your particular background. This decision should not be taken as a reflection of worth, only of fit.",
+  cit:"We appreciate the energy behind your application. Unfortunately, your trajectory did not meet our threshold for impact readiness this cycle. We encourage you to pivot, iterate, and reapply when your narrative has more traction.",
+  yale_state:"The Committee regrets that it is unable to offer admission at this time. The deliberation process is holistic and opaque by design. We wish you well in finding your proper institutional home."
+};
+const LOADING_SUBTEXTS=["Your application undergoes impact-fluent holistic review.","All decisions reflect our commitment to institutional excellence.","The process is designed to be equitable in its opacity."];
+
+const PROFILE_BASELINES={
+  legacy:{money:80,connections:75,time:60,stress:20,reputation:50,integrity:25},
+  first_gen:{money:20,connections:15,time:40,stress:70,reputation:30,integrity:80},
+  scholarship:{money:40,connections:30,time:20,stress:50,reputation:60,integrity:50},
+};
+const PROFILE_LABELS={legacy:"Well-Rounded Leader",first_gen:"Resilient Achiever",scholarship:"Impact-Driven Scholar"};
+const PROFILE_SCORES={legacy:{capital:8,grit:2,performance:4},first_gen:{capital:2,grit:8,performance:5},scholarship:{capital:3,grit:5,performance:8}};
+const COSMETIC_WEIGHTS={princesstown:{wealth:2.0,striving:0.5,rebellion:-1.0},cit:{wealth:0.8,striving:1.0,rebellion:-0.8},yale_state:{wealth:1.5,striving:1.2,rebellion:-0.5}};
+const ACCEPT_THRESHOLD=22,WAITLIST_THRESHOLD=16;
+
+// ── Engine Functions ────────────────────────────────────────────
+function assignProfile(answers) {
+  const totals={capital:0,grit:0,performance:0};
+  answers.forEach((aIdx,qIdx)=>{const s=QUESTIONS[qIdx].answers[aIdx].scores;for(const k in totals)totals[k]+=s[k];});
+  let dom='capital';for(const k in totals)if(totals[k]>totals[dom])dom=k;
+  const map={capital:'legacy',grit:'first_gen',performance:'scholarship'};
+  const key=map[dom];return{key,label:PROFILE_LABELS[key]};
+}
+function computeDecision(persistent,collegeId) {
+  const profile=persistent.profile||'first_gen',tags=persistent.cosmetic_tags||{},college=COLLEGE_LOOKUP[collegeId];
+  const ps=PROFILE_SCORES[profile];
+  let alignment=0;for(const d in college.bias)alignment+=ps[d]*college.bias[d];
+  const cw=COSMETIC_WEIGHTS[collegeId]||{};
+  let cosScore=0;for(const t in tags)cosScore+=tags[t]*(cw[t]||0);
+  let extraBonus=0;for(const app of(persistent.applications||[]))if(app.college_id===collegeId)extraBonus+=(app.extracurricular_selections||[]).length*0.5;
+  const total=alignment+cosScore+extraBonus;
+  return total>=ACCEPT_THRESHOLD?'accepted':total>=WAITLIST_THRESHOLD?'waitlisted':'rejected';
+}
+function computeAllDecisions(persistent) {
+  const d={};for(const app of(persistent.applications||[])){const cid=app.college_id;if(cid){const c=COLLEGE_LOOKUP[cid];d[c.name]=computeDecision(persistent,cid);}}return d;
+}
+function computeFinalStats(persistent) {
+  const profile=persistent.profile||'first_gen',tags=persistent.cosmetic_tags||{},decisions=persistent.decisions||{};
+  const s={...PROFILE_BASELINES[profile]};
+  const w=tags.wealth||0,st=tags.striving||0,r=tags.rebellion||0;
+  s.money+=w*3;s.connections+=w*2;s.integrity-=w*2;s.stress+=st*2;s.reputation+=st*2;s.time-=st*2;s.integrity+=r*3;s.reputation-=r*2;s.connections-=r*2;
+  for(const res of Object.values(decisions)){if(res==='accepted'){s.reputation+=10;s.stress+=5;}else if(res==='waitlisted')s.stress+=10;else{s.reputation-=5;s.integrity+=5;}}
+  if(profile==='legacy')s.integrity=Math.min(s.integrity,40);
+  for(const k in s)s[k]=Math.max(0,Math.min(100,s[k]));return s;
+}
+
+// ── Asset Loader ────────────────────────────────────────────────
+const IMAGES={};
+async function loadAssets() {
+  const manifest=[];
+  ['cat','dog','fox'].forEach(s=>manifest.push({key:s+'_base',src:`assets/sprites/characters/${s}_base.png`}));
+  const species=['cat','dog','fox'];
+  ACCESSORIES.forEach(a=>{
+    if(BODY_FITTED.has(a.slot)){
+      species.forEach(s=>manifest.push({key:a.sprite+'_'+s,src:`assets/sprites/accessories/${a.sprite}_${s}.png`}));
+      manifest.push({key:a.sprite,src:`assets/sprites/accessories/${a.sprite}.png`});
+    } else {
+      manifest.push({key:a.sprite,src:`assets/sprites/accessories/${a.sprite}.png`});
+    }
+  });
+  const bar=document.getElementById('loading-bar');
+  const txt=document.getElementById('loading-text');
+  let loaded=0,total=manifest.length;
+  await Promise.all(manifest.map(item=>new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{IMAGES[item.key]=img;loaded++;bar.style.width=Math.round(loaded/total*100)+'%';resolve();};
+    img.onerror=()=>{loaded++;bar.style.width=Math.round(loaded/total*100)+'%';resolve();};
+    img.src=item.src;
+  })));
+  txt.textContent='Ready!';
+  await document.fonts.ready;
+  await new Promise(r=>setTimeout(r,300));
+}
+
+// ── Scene Base ──────────────────────────────────────────────────
+class Scene {
+  constructor(){this.done=false;this.quit=false;this.nextScene=null;this.persistent={};}
+  startup(p){this.persistent=p;this.done=false;this.quit=false;this.nextScene=null;}
+  cleanup(){return this.persistent;}
+  handleClick(x,y){}
+  handleMove(x,y){}
+  handleKey(e){}
+  update(dt){}
+  draw(){}
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SCENE 1: MAIN MENU
+// ══════════════════════════════════════════════════════════════════
+class MainMenuScene extends Scene {
+  startup(p){super.startup(p);this.hovered=null;}
+  handleClick(x,y){
+    if(inRect(x,y,440,498,400,84)){this.nextScene='PERSONALITY_TEST';this.done=true;}
+    if(inRect(x,y,440,618,400,84))this.quit=true;
+  }
+  handleMove(x,y){this.hovered=inRect(x,y,440,498,400,84)?'start':inRect(x,y,440,618,400,84)?'quit':null;}
+  handleKey(e){if(e.key==='Enter'){this.nextScene='PERSONALITY_TEST';this.done=true;}}
+  draw(){
+    fillRect(0,0,W,H,C.bg);const cx=W/2;
+    drawLine(160,120,W-160,120,C.rule,2);
+    // Diamond
+    ctx.fillStyle=C.accent;ctx.beginPath();ctx.moveTo(cx,112);ctx.lineTo(cx+8,120);ctx.lineTo(cx,128);ctx.lineTo(cx-8,120);ctx.closePath();ctx.fill();
+    drawText('HYBRIS',cx,220,C.accentDark,font(72,true),'center','middle');
+    drawText('Create Your Applicant',cx,300,C.textDim,font(32,false,true),'center','middle');
+    drawLine(320,350,W-320,350,C.rule,2);
+    drawText('A holistic assessment of your potential.',cx,400,C.textLight,font(22),'center','middle');
+    drawButton(440,498,400,84,'Begin Assessment',font(28,true),this.hovered==='start');
+    drawButton(440,618,400,84,'Exit',font(28,true),this.hovered==='quit');
+    drawLine(160,H-120,W-160,H-120,C.rule,2);
+    drawText('v1.0  \u00b7  Institutional Review Pending',cx,H-84,C.textLight,font(22),'center','middle');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SCENE 2: PERSONALITY TEST
+// ══════════════════════════════════════════════════════════════════
+class PersonalityTestScene extends Scene {
+  startup(p){super.startup(p);this.currentQ=0;this.selected=0;this.answers=[];this.state='question';this.processTimer=0;this.twTimer=0;this.twIndex=0;this.answerRects=[];}
+  handleClick(x,y){
+    if(this.state!=='question')return;
+    for(let i=0;i<this.answerRects.length;i++){const r=this.answerRects[i];if(inRect(x,y,r.x,r.y,r.w,r.h)){this.selected=i;this._confirm();return;}}
+  }
+  handleMove(x,y){if(this.state!=='question')return;for(let i=0;i<this.answerRects.length;i++){const r=this.answerRects[i];if(inRect(x,y,r.x,r.y,r.w,r.h)){this.selected=i;return;}}}
+  handleKey(e){
+    if(this.state!=='question')return;const n=QUESTIONS[this.currentQ].answers.length;
+    if(e.key==='ArrowUp')this.selected=(this.selected-1+n)%n;
+    else if(e.key==='ArrowDown')this.selected=(this.selected+1)%n;
+    else if(e.key==='Enter')this._confirm();
+  }
+  _confirm(){
+    this.answers.push(this.selected);this.currentQ++;this.selected=0;this.twTimer=0;this.twIndex=0;
+    if(this.currentQ>=QUESTIONS.length){this.state='processing';this.processTimer=0;}
+  }
+  update(dt){
+    if(this.state==='question'){this.twTimer+=dt;this.twIndex=Math.min(Math.floor(this.twTimer*40),QUESTIONS[this.currentQ].text.length);}
+    else if(this.state==='processing'){this.processTimer+=dt;if(this.processTimer>=2.5){
+      const{key,label}=assignProfile(this.answers);
+      Object.assign(this.persistent,{quiz_answers:this.answers,profile:key,profile_label:label,base_stats:{...PROFILE_BASELINES[key]}});
+      this.nextScene='AVATAR_SELECT';this.done=true;
+    }}
+  }
+  draw(){
+    fillRect(0,0,W,H,C.bg);
+    const qn=this.state==='question'?this.currentQ+1:QUESTIONS.length;
+    drawText(`Intake Assessment  \u00b7  Question ${qn} of ${QUESTIONS.length}`,80,50,C.textDim,font(30));
+    drawLine(80,88,W-80,88,C.rule,2);
+    if(this.state==='question')this._drawQ();else this._drawProc();
+  }
+  _drawQ(){
+    const q=QUESTIONS[this.currentQ],vis=q.text.substring(0,this.twIndex);
+    const lines=wrapText(vis,font(40,false,true),W-200);
+    let y=130;for(const l of lines){drawText(l,100,y,C.accentDark,font(40,false,true));y+=44;}
+    y=Math.max(y+50,280);this.answerRects=[];
+    for(let i=0;i<q.answers.length;i++){
+      const r={x:100,y,w:W-200,h:100};this.answerRects.push(r);const sel=i===this.selected;
+      fillRect(r.x,r.y,r.w,r.h,sel?C.panelHover:C.panelBg,8);strokeRect(r.x,r.y,r.w,r.h,sel?C.accent:C.panelBorder,2,8);
+      if(sel)fillCircle(r.x+36,r.y+r.h/2,10,C.accent);else strokeCircle(r.x+36,r.y+r.h/2,10,C.panelBorder,2);
+      const al=wrapText(q.answers[i].text,font(34,true),r.w-100);let ay=r.y+16;
+      for(const a of al){drawText(a,r.x+72,ay,sel?C.text:C.textDim,font(34,true));ay+=36;}
+      y+=120;
+    }
+    drawText('\u2191\u2193 or click  \u00b7  Enter to confirm',100,H-110,C.textLight,font(30));
+  }
+  _drawProc(){
+    const cx=W/2;drawText('Processing your profile\u2026',cx,H/2-80,C.text,font(40,false,true),'center','top');
+    const bw=520,bh=28,bx=(W-bw)/2,by=H/2,p=steppedProgress(this.processTimer,2.5);
+    fillRect(bx,by,bw,bh,C.panelBorder,14);if(p>0)fillRect(bx,by,bw*p,bh,C.accent,14);
+    drawText('Holistic deliberation in progress\u2026',cx,by+48,C.textLight,font(30),'center','top');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SCENE 3: AVATAR SELECT
+// ══════════════════════════════════════════════════════════════════
+class AvatarSelectScene extends Scene {
+  startup(p){super.startup(p);this.selected=0;this.cardW=300;this.cardH=400;this.spacing=60;
+    const tw=this.cardW*3+this.spacing*2;this.startX=(W-tw)/2;this.hoverConfirm=false;}
+  handleClick(x,y){
+    for(let i=0;i<3;i++){const cx=this.startX+i*(this.cardW+this.spacing);if(inRect(x,y,cx,220,this.cardW,this.cardH))this.selected=i;}
+    if(inRect(x,y,W/2-180,702,360,76)){this.persistent.species=['cat','dog','fox'][this.selected];this.nextScene='DRESS_UP';this.done=true;}
+  }
+  handleMove(x,y){
+    for(let i=0;i<3;i++){const cx=this.startX+i*(this.cardW+this.spacing);if(inRect(x,y,cx,220,this.cardW,this.cardH))this.selected=i;}
+    this.hoverConfirm=inRect(x,y,W/2-180,702,360,76);
+  }
+  handleKey(e){
+    if(e.key==='ArrowLeft')this.selected=(this.selected+2)%3;
+    else if(e.key==='ArrowRight')this.selected=(this.selected+1)%3;
+    else if(e.key==='Enter'){this.persistent.species=['cat','dog','fox'][this.selected];this.nextScene='DRESS_UP';this.done=true;}
+  }
+  draw(){
+    fillRect(0,0,W,H,C.bg);
+    drawText(`Profile: ${this.persistent.profile_label||'Applicant'}  \u00b7  Select Your Representative`,80,40,C.textDim,font(30));
+    drawLine(80,76,W-80,76,C.rule,2);
+    drawText('Choose Your Avatar',W/2,130,C.accentDark,font(48,true),'center','middle');
+    drawText('Your representative for the admissions process.',W/2,180,C.textLight,font(30),'center','middle');
+    const species=['cat','dog','fox'];
+    for(let i=0;i<3;i++){
+      const x=this.startX+i*(this.cardW+this.spacing),y=220,sel=i===this.selected;
+      fillRect(x,y,this.cardW,this.cardH,sel?C.panelHover:C.panelBg,12);
+      strokeRect(x,y,this.cardW,this.cardH,sel?C.accent:C.panelBorder,sel?3:2,12);
+      const img=IMAGES[species[i]+'_base'];
+      if(img){const areaH=this.cardH-72,scale=Math.min((this.cardW-32)/img.width,areaH/img.height),nw=img.width*scale,nh=img.height*scale;
+        ctx.drawImage(img,x+this.cardW/2-nw/2,y+12+(areaH-nh)/2,nw,nh);}
+      drawText(species[i].charAt(0).toUpperCase()+species[i].slice(1),x+this.cardW/2,y+this.cardH-32,sel?C.accentDark:C.textDim,font(36,true),'center','middle');
+    }
+    drawButton(W/2-180,702,360,76,'Confirm Selection',font(36,true),this.hoverConfirm);
+    drawText('\u2190\u2192 or click  \u00b7  Enter to confirm',W/2,H-100,C.textLight,font(30),'center','middle');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SCENE 4: DRESS UP
+// ══════════════════════════════════════════════════════════════════
+class DressUpScene extends Scene {
+  startup(p){super.startup(p);this.species=p.species||'cat';this.equipped={hat:null,glasses:null,neck:null,top:null,bottoms:null};
+    this.hoverItem=null;this.tooltip='';this.tooltipTimer=0;this.mx=0;this.my=0;
+    this._buildLayout();
+  }
+  _buildLayout(){
+    this.slotRows={};this.itemBtns={};const lm=40,rw=520,rh=104,sy=100,rg=8,bs=96;
+    SLOT_ORDER.forEach((slot,i)=>{
+      const ry=sy+i*(rh+rg);this.slotRows[slot]={x:lm,y:ry,w:rw,h:rh};
+      const items=ACC_BY_SLOT[slot]||[];const bax=lm+140,baw=rw-140-16,tbw=items.length*bs+(items.length-1)*12,bsx=bax+(baw-tbw)/2;
+      items.forEach((a,j)=>{this.itemBtns[a.id]={x:bsx+j*(bs+12),y:ry+(rh-bs)/2,w:bs,h:bs};});
+    });
+    const bw=240,bh=56,bg=12,lrb=sy+5*(rh+rg),by=lrb+20;
+    this.resetBtn={x:lm,y:by,w:bw,h:bh};this.confirmBtn={x:lm+bw+bg,y:by,w:bw,h:bh};
+    this.exitBtn={x:lm,y:by+bh+bg,w:bw*2+bg,h:bh};
+  }
+  handleClick(x,y){
+    if(inRect(x,y,this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h)){this._confirm();return;}
+    if(inRect(x,y,this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h)){for(const s of SLOT_ORDER)this.equipped[s]=null;this.tooltip='Outfit reset';this.tooltipTimer=1.5;return;}
+    if(inRect(x,y,this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h)){this.nextScene='MAIN_MENU';this.done=true;return;}
+    for(const[aid,r]of Object.entries(this.itemBtns)){
+      if(inRect(x,y,r.x,r.y,r.w,r.h)){const a=ACC_LOOKUP[aid];
+        if(this.equipped[a.slot]===aid){this.equipped[a.slot]=null;this.tooltip=`Removed ${a.name}`;}
+        else{this.equipped[a.slot]=aid;this.tooltip=`\u201c${a.flavor}\u201d`;}
+        this.tooltipTimer=2.5;return;}
+    }
+  }
+  handleMove(x,y){this.mx=x;this.my=y;this.hoverItem=null;
+    for(const[aid,r]of Object.entries(this.itemBtns))if(inRect(x,y,r.x,r.y,r.w,r.h)){this.hoverItem=aid;break;}
+  }
+  handleKey(e){if(e.key==='Enter')this._confirm();}
+  _confirm(){
+    const tags={wealth:0,striving:0,rebellion:0};
+    for(const aid of Object.values(this.equipped))if(aid){const a=ACC_LOOKUP[aid];for(const t in a.tags)tags[t]+=a.tags[t];}
+    Object.assign(this.persistent,{equipped_accessories:{...this.equipped},cosmetic_tags:tags});
+    this.nextScene='COLLEGE_APP';this.done=true;
+  }
+  update(dt){if(this.tooltipTimer>0){this.tooltipTimer-=dt;if(this.tooltipTimer<=0)this.tooltip='';}}
+  draw(){
+    fillRect(0,0,W,H,C.bg);strokeRect(12,12,W-24,H-24,C.rule,2,8);
+    drawText(`Dress Up \u2014 ${this.species.charAt(0).toUpperCase()+this.species.slice(1)}`,W/2,28,C.text,font(48,true),'center','top');
+    const ruleY=82;drawLine(32,ruleY,W-32,ruleY,C.rule,2);
+    // Wardrobe
+    for(const slot of SLOT_ORDER){
+      const rr=this.slotRows[slot];
+      fillRect(rr.x,rr.y,rr.w,rr.h,C.shelfBg,8);fillRect(rr.x,rr.y,rr.w,4,C.shelfLight);fillRect(rr.x,rr.y+rr.h-6,rr.w,6,C.shelfDark,4);strokeRect(rr.x,rr.y,rr.w,rr.h,C.shelfEdge,2,8);
+      drawText(SLOT_LABELS[slot],rr.x+20,rr.y+rr.h/2,C.bg,font(26,true),'left','middle');
+      for(const a of(ACC_BY_SLOT[slot]||[])){
+        const r=this.itemBtns[a.id],eq=this.equipped[slot]===a.id,hov=this.hoverItem===a.id;
+        fillRect(r.x,r.y,r.w,r.h,eq?C.panelHover:hov?'#fffaf0':C.panelBg,8);
+        strokeRect(r.x,r.y,r.w,r.h,eq?C.accent:hov?C.accentLight:C.panelBorder,eq?3:2,8);
+        // Draw thumbnail
+        const img=this._getAccImg(a);
+        if(img){const pad=16,md=r.w-pad*2,sc=Math.min(md/img.width,md/img.height),nw=img.width*sc,nh=img.height*sc;
+          ctx.drawImage(img,r.x+r.w/2-nw/2,r.y+r.h/2-nh/2,nw,nh);}
+        if(eq)fillCircle(r.x+r.w-10,r.y+10,6,C.accent);
+      }
+    }
+    // Character preview
+    this._drawCharacter(620,ruleY+16);
+    // Equipped count
+    const ec=Object.values(this.equipped).filter(v=>v).length;
+    const charX=620,avW=W-charX-32,anch=ANCHORS[this.species],pvH=520,pvScale=pvH/anch.h,pvW=Math.max(1,Math.round(anch.w*pvScale));
+    const ccx=charX+(avW-pvW)/2;
+    drawText(`${ec}/5 items equipped`,ccx+pvW/2,ruleY+16+pvH+8,C.textDim,font(26),'center','top');
+    // Buttons
+    const ml={x:this.mx,y:this.my};
+    drawButton(this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h,'RESET',font(32,true),
+      inRect(ml.x,ml.y,this.resetBtn.x,this.resetBtn.y,this.resetBtn.w,this.resetBtn.h),'rgb(200,180,155)','rgb(180,155,125)');
+    drawButton(this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h,'Continue',font(32,true),
+      inRect(ml.x,ml.y,this.confirmBtn.x,this.confirmBtn.y,this.confirmBtn.w,this.confirmBtn.h));
+    drawButton(this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h,'Exit to Menu',font(32,true),
+      inRect(ml.x,ml.y,this.exitBtn.x,this.exitBtn.y,this.exitBtn.w,this.exitBtn.h),'rgb(210,195,172)','rgb(190,170,145)');
+    if(this.tooltip)drawText(this.tooltip,40,H-36,C.accentDark,font(26));
+  }
+  _getAccImg(a){
+    if(BODY_FITTED.has(a.slot))return IMAGES[a.sprite+'_'+this.species]||IMAGES[a.sprite]||null;
+    return IMAGES[a.sprite]||null;
+  }
+  _drawCharacter(cx,cy){
+    const anch=ANCHORS[this.species],pvH=520,pvScale=pvH/anch.h,pvW=Math.max(1,Math.round(anch.w*pvScale));
+    const avW=W-cx-32,dx=cx+(avW-pvW)/2;
+    // Compose on offscreen canvas
+    const off=document.createElement('canvas');off.width=anch.w;off.height=anch.h;const oc=off.getContext('2d');
+    const base=IMAGES[this.species+'_base'];if(base)oc.drawImage(base,0,0);
+    for(const slot of['bottoms','top']){const aid=this.equipped[slot];if(aid){const img=IMAGES[ACC_LOOKUP[aid].sprite+'_'+this.species]||IMAGES[ACC_LOOKUP[aid].sprite];if(img)oc.drawImage(img,0,0);}}
+    for(const slot of['neck','glasses','hat']){const aid=this.equipped[slot];if(aid){const img=IMAGES[ACC_LOOKUP[aid].sprite];if(img){const p=this._anchorPos(slot,img,anch);oc.drawImage(img,p.x,p.y);}}}
+    ctx.drawImage(off,dx,cy,pvW,pvH);
+  }
+  _anchorPos(slot,img,a){
+    const sw=img.width,sh=img.height;
+    if(slot==='hat')return{x:a.eye_cx-sw/2,y:Math.max(0,a.eye_cy-sh-10)};
+    if(slot==='glasses')return{x:a.eye_cx-sw/2,y:a.eye_cy-sh/2};
+    if(slot==='neck')return{x:a.eye_cx-sw/2,y:a.neck_y-sh/4};
+    return{x:0,y:0};
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SCENE 5: COLLEGE APP
+// ══════════════════════════════════════════════════════════════════
+class CollegeAppScene extends Scene {
+  startup(p){super.startup(p);this.phase='select';this.selectedColleges=[];this.applications=[];this.currentAppIdx=0;this.processTimer=0;
+    this.essayChoice=0;this.extraSelected=new Set();this.statement='';this.cursorTimer=0;this.cursorVisible=true;this._buildSelect();}
+  _buildSelect(){this.collegeRects=[];let y=180;COLLEGES.forEach(()=>{this.collegeRects.push({x:100,y,w:W-200,h:180});y+=200;});
+    this.confirmRect={x:W/2-180,y:y+40,w:360,h:68};}
+  _buildApp(){
+    const c=COLLEGES[this.selectedColleges[this.currentAppIdx]];
+    this.essayRects=[];let y=170;c.essayPrompts.forEach(()=>{this.essayRects.push({x:80,y,w:W-160,h:64});y+=76;});
+    this.extraRects=[];y+=28;c.extracurriculars.forEach(()=>{this.extraRects.push({x:80,y,w:W-160,h:44});y+=52;});
+    const lb=this.extraRects.length?this.extraRects[this.extraRects.length-1].y+44:y;
+    this.submitRect={x:W/2-180,y:lb+20+32+68+90,w:360,h:68};
+    this.essayChoice=0;this.extraSelected=new Set();this.statement='';
+  }
+  handleClick(x,y){
+    if(this.phase==='select'){
+      for(let i=0;i<this.collegeRects.length;i++){const r=this.collegeRects[i];if(inRect(x,y,r.x,r.y,r.w,r.h)){
+        const idx=this.selectedColleges.indexOf(i);if(idx>=0)this.selectedColleges.splice(idx,1);else if(this.selectedColleges.length<2)this.selectedColleges.push(i);}}
+      if(inRect(x,y,this.confirmRect.x,this.confirmRect.y,this.confirmRect.w,this.confirmRect.h)&&this.selectedColleges.length===2){
+        this.phase='apply';this.currentAppIdx=0;this._buildApp();}
+    } else if(this.phase==='apply'){
+      for(let i=0;i<this.essayRects.length;i++){const r=this.essayRects[i];if(inRect(x,y,r.x,r.y,r.w,r.h))this.essayChoice=i;}
+      for(let i=0;i<this.extraRects.length;i++){const r=this.extraRects[i];if(inRect(x,y,r.x,r.y,r.w,r.h)){
+        if(this.extraSelected.has(i))this.extraSelected.delete(i);else if(this.extraSelected.size<2)this.extraSelected.add(i);}}
+      if(inRect(x,y,this.submitRect.x,this.submitRect.y,this.submitRect.w,this.submitRect.h))this._submit();
+    }
+  }
+  handleKey(e){
+    if(this.phase==='apply'){
+      if(e.key==='Backspace')this.statement=this.statement.slice(0,-1);
+      else if(e.key==='Enter'&&this.statement)this._submit();
+      else if(e.key.length===1&&this.statement.length<200)this.statement+=e.key;
+    }
+  }
+  _submit(){
+    const c=COLLEGES[this.selectedColleges[this.currentAppIdx]];
+    this.applications.push({college:c.name,college_id:c.id,essay_topic_index:this.essayChoice,
+      extracurricular_selections:[...this.extraSelected],personal_statement_length:this.statement.length});
+    this.currentAppIdx++;
+    if(this.currentAppIdx<this.selectedColleges.length)this._buildApp();
+    else{this.persistent.applications=this.applications;this.phase='processing';this.processTimer=0;}
+  }
+  update(dt){
+    if(this.phase==='apply'){this.cursorTimer+=dt;this.cursorVisible=(this.cursorTimer%1)<0.5;}
+    else if(this.phase==='processing'){this.processTimer+=dt;if(this.processTimer>=3){this.nextScene='DECISION';this.done=true;}}
+  }
+  draw(){
+    fillRect(0,0,W,H,C.bg);
+    if(this.phase==='select')this._drawSelect();else if(this.phase==='apply')this._drawApply();else this._drawProc();
+  }
+  _drawSelect(){
+    drawText('College Application Portal  \u00b7  Select 2 Institutions',80,30,C.textDim,font(30));
+    drawLine(80,64,W-80,64,C.rule,2);
+    drawText('Where Will You Apply?',W/2,100,C.accentDark,font(44,true),'center','middle');
+    drawText(`Select 2 of ${COLLEGES.length} institutions.`,W/2,144,C.textLight,font(26),'center','middle');
+    COLLEGES.forEach((c,i)=>{
+      const r=this.collegeRects[i],sel=this.selectedColleges.includes(i);
+      fillRect(r.x,r.y,r.w,r.h,sel?C.panelHover:C.panelBg,10);strokeRect(r.x,r.y,r.w,r.h,sel?C.accent:C.panelBorder,sel?3:2,10);
+      // Checkbox
+      fillRect(r.x+24,r.y+24,32,32,C.panelBg,4);strokeRect(r.x+24,r.y+24,32,32,sel?C.accent:C.panelBorder,2,4);
+      if(sel){ctx.strokeStyle=C.accent;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(r.x+30,r.y+40);ctx.lineTo(r.x+40,r.y+50);ctx.lineTo(r.x+50,r.y+30);ctx.stroke();}
+      drawText(c.name,r.x+76,r.y+20,C.text,font(32,true));
+      drawText(c.motto,r.x+76,r.y+56,C.accent,font(26));
+      drawText(c.tagline,r.x+76,r.y+90,C.textDim,font(30));
+      drawText(c.extracurriculars.slice(0,3).join(', ')+'\u2026',r.x+76,r.y+130,C.textLight,font(26));
+    });
+    const ok=this.selectedColleges.length===2;
+    fillRect(this.confirmRect.x,this.confirmRect.y,this.confirmRect.w,this.confirmRect.h,ok?C.btnIdle:C.bgAlt,8);
+    strokeRect(this.confirmRect.x,this.confirmRect.y,this.confirmRect.w,this.confirmRect.h,ok?C.accent:C.panelBorder,2,8);
+    drawText(ok?'Begin Applications':`Select ${2-this.selectedColleges.length} More`,this.confirmRect.x+this.confirmRect.w/2,this.confirmRect.y+this.confirmRect.h/2,ok?C.btnText:C.textLight,font(32,true),'center','middle');
+  }
+  _drawApply(){
+    const c=COLLEGES[this.selectedColleges[this.currentAppIdx]];
+    drawText(`Application ${this.currentAppIdx+1} of ${this.selectedColleges.length}  \u00b7  ${c.name}`,80,24,C.textDim,font(30));
+    drawLine(80,56,W-80,56,C.rule,2);
+    drawText(`Applicant: ${(this.persistent.species||'?').charAt(0).toUpperCase()+(this.persistent.species||'?').slice(1)}  |  Type: ${this.persistent.profile_label||'?'}`,80,76,C.textLight,font(26));
+    drawText('Select Essay Prompt:',80,136,C.accentDark,font(32,true));
+    this.essayRects.forEach((r,i)=>{
+      const sel=i===this.essayChoice;fillRect(r.x,r.y,r.w,r.h,sel?C.panelHover:C.panelBg,8);strokeRect(r.x,r.y,r.w,r.h,sel?C.accent:C.panelBorder,2,8);
+      strokeCircle(r.x+28,r.y+r.h/2,12,sel?C.accent:C.panelBorder,2);if(sel)fillCircle(r.x+28,r.y+r.h/2,8,C.accent);
+      const txt=this._trunc(c.essayPrompts[i],font(30),r.w-70);drawText(txt,r.x+52,r.y+r.h/2,sel?C.text:C.textDim,font(30),'left','middle');
+    });
+    const ya=this.essayRects.length?this.essayRects[this.essayRects.length-1].y+64+12:360;
+    drawText('Select 2 Activities:',80,ya,C.accentDark,font(32,true));
+    this.extraRects.forEach((r,i)=>{
+      const sel=this.extraSelected.has(i);fillRect(r.x,r.y,r.w,r.h,sel?C.panelHover:C.panelBg,6);strokeRect(r.x,r.y,r.w,r.h,sel?C.accent:C.panelBorder,2,6);
+      fillRect(r.x+12,r.y+r.h/2-12,24,24,C.panelBg,4);strokeRect(r.x+12,r.y+r.h/2-12,24,24,sel?C.accent:C.panelBorder,2,4);
+      if(sel){ctx.strokeStyle=C.accent;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(r.x+16,r.y+r.h/2);ctx.lineTo(r.x+24,r.y+r.h/2+8);ctx.lineTo(r.x+32,r.y+r.h/2-8);ctx.stroke();}
+      drawText(c.extracurriculars[i],r.x+48,r.y+r.h/2,sel?C.text:C.textDim,font(30),'left','middle');
+    });
+    const ys=this.extraRects.length?this.extraRects[this.extraRects.length-1].y+44+20:620;
+    drawText('Personal Statement:',80,ys,C.accentDark,font(32,true));
+    const sr={x:80,y:ys+32,w:W-160,h:68};fillRect(sr.x,sr.y,sr.w,sr.h,C.panelBg,8);strokeRect(sr.x,sr.y,sr.w,sr.h,C.panelBorder,2,8);
+    const dt=this.statement+(this.cursorVisible?'|':'');const mc=Math.floor((sr.w-32)/14);
+    drawText(dt.slice(-mc),sr.x+16,sr.y+12,C.text,font(30));
+    drawText(`${this.statement.length}/200`,sr.x+sr.w-70,sr.y+sr.h+6,C.textLight,font(26));
+    if(!this.statement)drawText('Begin typing your authentic narrative here\u2026',sr.x+16,sr.y+40,C.textLight,font(26));
+    drawButton(this.submitRect.x,this.submitRect.y,this.submitRect.w,this.submitRect.h,'Submit Application',font(32,true),false);
+  }
+  _drawProc(){
+    const cx=W/2;drawText('Submitting applications\u2026',cx,H/2-80,C.text,font(44,true),'center','top');
+    const bw=520,bh=28,bx=(W-bw)/2,by=H/2,p=steppedProgress(this.processTimer,3);
+    fillRect(bx,by,bw,bh,C.panelBorder,14);if(p>0)fillRect(bx,by,bw*p,bh,C.accent,14);
+    const idx=Math.min(Math.floor(this.processTimer),LOADING_SUBTEXTS.length-1);
+    drawText(LOADING_SUBTEXTS[idx],cx,by+48,C.textLight,font(26),'center','top');
+  }
+  _trunc(text,f,maxW){if(measureText(text,f)<=maxW)return text;while(measureText(text+'\u2026',f)>maxW&&text)text=text.slice(0,-1);return text+'\u2026';}
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SCENE 6: DECISION
+// ══════════════════════════════════════════════════════════════════
+class DecisionScene extends Scene {
+  startup(p){super.startup(p);this.decisions=computeAllDecisions(p);p.decisions=this.decisions;
+    this.revealOrder=Object.keys(this.decisions);this.currentReveal=0;this.state='envelope';this.fadeTimer=0;}
+  handleClick(x,y){
+    if(this.state==='envelope'&&inRect(x,y,W/2-260,H/2-170,520,300)){this.state='revealed';this.fadeTimer=0;}
+    else if(this.state==='revealed'&&inRect(x,y,W/2-160,H-154,320,68)){this.currentReveal++;if(this.currentReveal>=this.revealOrder.length)this.state='all_done';else{this.state='envelope';this.fadeTimer=0;}}
+    else if(this.state==='all_done'&&inRect(x,y,W/2-160,H-154,320,68)){this.nextScene='EXPORT';this.done=true;}
+  }
+  handleKey(e){
+    if(e.key!=='Enter')return;
+    if(this.state==='envelope'){this.state='revealed';this.fadeTimer=0;}
+    else if(this.state==='revealed'){this.currentReveal++;if(this.currentReveal>=this.revealOrder.length)this.state='all_done';else{this.state='envelope';this.fadeTimer=0;}}
+    else if(this.state==='all_done'){this.nextScene='EXPORT';this.done=true;}
+  }
+  update(dt){this.fadeTimer+=dt;}
+  draw(){
+    fillRect(0,0,W,H,C.bg);
+    if(this.state==='envelope')this._drawEnvelope();else if(this.state==='revealed')this._drawRevealed();else this._drawSummary();
+  }
+  _drawEnvelope(){
+    const cx=W/2,name=this.revealOrder[this.currentReveal];
+    drawText(`Decision ${this.currentReveal+1} of ${this.revealOrder.length}`,cx,60,C.textDim,font(32),'center','top');
+    drawText('Decision Letter',cx,130,C.accentDark,font(52,true),'center','middle');
+    const ex=cx-260,ey=H/2-170,ew=520,eh=300;
+    fillRect(ex,ey,ew,eh,'rgb(235,220,195)',8);strokeRect(ex,ey,ew,eh,C.accent,3,8);
+    // Flap
+    ctx.fillStyle='rgb(225,210,185)';ctx.beginPath();ctx.moveTo(ex+4,ey+4);ctx.lineTo(cx,ey+eh/2-40);ctx.lineTo(ex+ew-4,ey+4);ctx.closePath();ctx.fill();
+    ctx.strokeStyle=C.accent;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ex+4,ey+4);ctx.lineTo(cx,ey+eh/2-40);ctx.lineTo(ex+ew-4,ey+4);ctx.stroke();
+    // Seal
+    fillCircle(cx,ey+eh/2-40,28,C.accent);strokeCircle(cx,ey+eh/2-40,28,C.accentDark,3);
+    drawText('H',cx,ey+eh/2-40,C.bg,font(26),'center','middle');
+    drawText(name,cx,ey+eh/2+30,C.text,font(34,true),'center','middle');
+    drawText('Click to open',cx,ey+eh+40,C.textLight,font(32),'center','middle');
+  }
+  _drawRevealed(){
+    const cx=W/2,name=this.revealOrder[this.currentReveal],result=this.decisions[name];
+    const rc={accepted:C.accept,waitlisted:C.waitlist,rejected:C.reject};
+    const rl={accepted:'ACCEPTED',waitlisted:'WAITLISTED',rejected:'REJECTED'};
+    drawText(name,cx,50,C.textDim,font(32),'center','top');drawLine(160,84,W-160,84,C.rule,2);
+    drawText(rl[result],cx,130,rc[result],font(52,true),'center','middle');
+    // Find letter
+    let cid=null;for(const c of COLLEGES)if(c.name===name){cid=c.id;break;}
+    let letter='';if(result==='accepted')letter=ACCEPTANCE_LETTERS[cid]||'You have been accepted.';
+    else if(result==='waitlisted')letter=WAITLIST_LETTERS[cid]||'You have been waitlisted.';
+    else letter=REJECTION_LETTERS[cid]||'We regret to inform you\u2026';
+    const lines=wrapText(letter,font(32),W-240);let y=210;for(const l of lines){drawText(l,120,y,C.text,font(32));y+=36;}
+    drawButton(W/2-160,H-154,320,68,'Continue',font(34,true),false);
+  }
+  _drawSummary(){
+    const cx=W/2,rc={accepted:C.accept,waitlisted:C.waitlist,rejected:C.reject},rl={accepted:'ACCEPTED',waitlisted:'WAITLISTED',rejected:'REJECTED'};
+    drawText('Admissions Summary',cx,90,C.accentDark,font(52,true),'center','middle');drawLine(200,140,W-200,140,C.rule,2);
+    let y=180;for(const[name,result]of Object.entries(this.decisions)){
+      drawText(name,160,y,C.text,font(34,true));
+      drawText(rl[result],W-160,y,rc[result],font(34,true),'right','top');
+      drawLine(160,y+44,W-160,y+44,C.rule,2);y+=80;}
+    drawText('All decisions reflect our commitment to institutional excellence.',cx,y+40,C.textLight,font(26),'center','top');
+    drawButton(W/2-160,H-154,320,68,'View Your Profile',font(34,true),false);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SCENE 7: EXPORT
+// ══════════════════════════════════════════════════════════════════
+class ExportScene extends Scene {
+  startup(p){super.startup(p);this.stats=computeFinalStats(p);p.stats=this.stats;this.saveMsg='';this.saveMsgTimer=0;}
+  handleClick(x,y){
+    if(inRect(x,y,60,H-150,260,60)){
+      try{localStorage.setItem('hybris_save',JSON.stringify(this._payload()));this.saveMsg='Saved to localStorage';}catch(e){this.saveMsg='Save failed';}this.saveMsgTimer=3;}
+    else if(inRect(x,y,340,H-150,260,60)){
+      const blob=new Blob([JSON.stringify(this._payload(),null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=u;a.download=`hybris_${this.persistent.species||'char'}_${Date.now()}.json`;a.click();URL.revokeObjectURL(u);
+      this.saveMsg='Exported JSON';this.saveMsgTimer=3;}
+    else if(inRect(x,y,W-320,H-150,260,60)){this.nextScene='MAIN_MENU';this.done=true;}
+  }
+  _payload(){return{game:'HYBRIS: Create Your Applicant',version:'1.0',character:{species:this.persistent.species,profile:this.persistent.profile,profile_label:this.persistent.profile_label,equipped_accessories:this.persistent.equipped_accessories},stats:this.stats,applications:this.persistent.applications,decisions:this.persistent.decisions,meta:{quiz_answers:this.persistent.quiz_answers,cosmetic_tags:this.persistent.cosmetic_tags}};}
+  update(dt){if(this.saveMsgTimer>0){this.saveMsgTimer-=dt;if(this.saveMsgTimer<=0)this.saveMsg='';}}
+  draw(){
+    fillRect(0,0,W,H,C.bg);const cx=W/2;
+    drawLine(120,32,W-120,32,C.rule,2);drawText('Applicant Dossier',cx,60,C.accentDark,font(48,true),'center','middle');
+    drawLine(120,100,W-120,100,C.rule,2);
+    drawText(`${(this.persistent.species||'?').charAt(0).toUpperCase()+(this.persistent.species||'?').slice(1)}  \u00b7  ${this.persistent.profile_label||'?'}`,cx,124,C.text,font(32,true),'center','middle');
+    // Stat bars
+    const STAT_COLORS={money:'rgb(180,155,50)',connections:'rgb(70,130,170)',time:'rgb(120,160,80)',stress:'rgb(175,80,65)',reputation:'rgb(140,110,180)',integrity:'rgb(80,160,130)'};
+    const STAT_ORDER=['money','connections','time','stress','reputation','integrity'];
+    let bx=100,bw=440,bh=32,y=180;
+    for(const sk of STAT_ORDER){const v=this.stats[sk]||0,c=STAT_COLORS[sk];
+      drawText(sk.charAt(0).toUpperCase()+sk.slice(1),bx,y,c,font(32,true));drawText(String(v),bx+bw+16,y+4,C.textDim,font(30));
+      const by=y+36;fillRect(bx,by,bw,bh,C.panelBorder,6);const fw=Math.round(bw*v/100);if(fw>0)fillRect(bx,by,fw,bh,c,6);y+=84;}
+    // Right column
+    let dx=740,dy=180;
+    drawText('Decisions',dx,dy,C.accentDark,font(32,true));drawLine(dx,dy+32,dx+400,dy+32,C.rule,2);dy+=48;
+    const rc={accepted:C.accept,waitlisted:C.waitlist,rejected:C.reject};
+    for(const[name,result]of Object.entries(this.persistent.decisions||{})){
+      drawText(name,dx,dy,C.textDim,font(30));dy+=28;drawText(result.toUpperCase(),dx+24,dy,rc[result]||C.text,font(30));dy+=44;}
+    dy+=16;drawText('Accessories',dx,dy,C.accentDark,font(32,true));drawLine(dx,dy+32,dx+400,dy+32,C.rule,2);dy+=44;
+    for(const[slot,aid]of Object.entries(this.persistent.equipped_accessories||{})){
+      const disp=aid?aid.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):'\u2014';
+      drawText(`${slot.charAt(0).toUpperCase()+slot.slice(1)}: ${disp}`,dx,dy,C.textDim,font(26));dy+=32;}
+    dy+=16;const tags=this.persistent.cosmetic_tags||{};
+    drawText(`Tags: W:${tags.wealth||0}  S:${tags.striving||0}  R:${tags.rebellion||0}`,dx,dy,C.textLight,font(26));
+    // Buttons
+    drawButton(60,H-150,260,60,'Save Local',font(32,true),false);
+    drawButton(340,H-150,260,60,'Export JSON',font(32,true),false);
+    drawButton(W-320,H-150,260,60,'Main Menu',font(32,true),false);
+    if(this.saveMsg)drawText(this.saveMsg,60,H-180,C.accept,font(30));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  GAME CONTROLLER
+// ══════════════════════════════════════════════════════════════════
+class Game {
+  constructor(){
+    this.scenes={MAIN_MENU:new MainMenuScene(),PERSONALITY_TEST:new PersonalityTestScene(),AVATAR_SELECT:new AvatarSelectScene(),
+      DRESS_UP:new DressUpScene(),COLLEGE_APP:new CollegeAppScene(),DECISION:new DecisionScene(),EXPORT:new ExportScene()};
+    this.current=this.scenes.MAIN_MENU;this.persistent={};this.current.startup(this.persistent);
+    this.lastTime=performance.now();this.running=true;
+    canvas.addEventListener('click',e=>this._onClick(e));
+    canvas.addEventListener('mousemove',e=>this._onMove(e));
+    document.addEventListener('keydown',e=>this._onKey(e));
+  }
+  _translate(e){
+    const r=canvas.getBoundingClientRect();
+    return{x:Math.max(0,Math.min(W-1,Math.floor((e.clientX-r.left)/r.width*W))),
+           y:Math.max(0,Math.min(H-1,Math.floor((e.clientY-r.top)/r.height*H)))};
+  }
+  _onClick(e){const p=this._translate(e);this.current.handleClick(p.x,p.y);}
+  _onMove(e){const p=this._translate(e);this.current.handleMove(p.x,p.y);}
+  _onKey(e){this.current.handleKey(e);}
+  loop(now){
+    if(!this.running)return;
+    const dt=Math.min((now-this.lastTime)/1000,0.1);this.lastTime=now;
+    this.current.update(dt);
+    if(this.current.quit){this.running=false;return;}
+    if(this.current.done)this._switch();
+    this.current.draw();
+    requestAnimationFrame(t=>this.loop(t));
+  }
+  _switch(){
+    const next=this.current.nextScene;const p=this.current.cleanup();Object.assign(this.persistent,p);
+    this.current=this.scenes[next];this.current.startup(this.persistent);
+  }
+  start(){requestAnimationFrame(t=>this.loop(t));}
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════════════
+(async function boot(){
+  await loadAssets();
+  document.getElementById('loading').style.display='none';
+  const game=new Game();
+  game.start();
+})();
+</script>
+</body>
+</html>

@@ -1,7 +1,9 @@
+import os
 import pygame
 from src.scene import Scene
+from src.font_loader import get_font
 from src.settings import (
-    LOGICAL_WIDTH, LOGICAL_HEIGHT, SCALE_FACTOR, COLOR_BG, COLOR_BG_ALT,
+    LOGICAL_WIDTH, LOGICAL_HEIGHT, COLOR_BG, COLOR_BG_ALT,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_LIGHT, COLOR_ACCENT, COLOR_ACCENT_DARK,
     COLOR_ACCENT_LIGHT, COLOR_PANEL_BG, COLOR_PANEL_BORDER, COLOR_PANEL_HOVER,
     COLOR_BUTTON_IDLE, COLOR_BUTTON_HOVER, COLOR_BUTTON_TEXT, COLOR_RULE_LINE,
@@ -29,10 +31,10 @@ ANCHORS = {
 }
 
 # Character preview height in logical pixels (width computed to keep aspect ratio)
-CHAR_PREVIEW_H = 260
+CHAR_PREVIEW_H = 520
 
 # Thumbnail button size
-THUMB_BTN_SIZE = 48
+THUMB_BTN_SIZE = 96
 
 # Wardrobe shelf colors (warm wood tones)
 COLOR_SHELF_BG = (185, 145, 105)
@@ -57,6 +59,7 @@ class DressUpScene(Scene):
         self.tooltip_text = ""
         self.tooltip_timer = 0
         self.hover_item = None        # acc_id being hovered
+        self.mouse_logical = (0, 0)   # last known logical mouse pos
 
         # Sprite caches
         self.base_surface = None      # raw base sprite (RGBA, original size)
@@ -72,10 +75,10 @@ class DressUpScene(Scene):
         super().startup(persistent)
         species = persistent.get("species", "cat")
         self.character = Character(species)
-        self.font = pygame.font.SysFont("Georgia", 12, bold=True)
-        self.small_font = pygame.font.SysFont("Georgia", 10)
-        self.title_font = pygame.font.SysFont("Georgia", 18, bold=True)
-        self.label_font = pygame.font.SysFont("Georgia", 10, bold=True)
+        self.font = get_font(32, bold=True)
+        self.small_font = get_font(26)
+        self.title_font = get_font(48, bold=True)
+        self.label_font = get_font(26, bold=True)
         self.tooltip_text = ""
         self.tooltip_timer = 0
         self.hover_item = None
@@ -89,10 +92,10 @@ class DressUpScene(Scene):
         anch = ANCHORS[species]
 
         # --- Base character ---
-        base_path = SPRITE_DIR / "characters" / f"{species}_base.png"
-        if base_path.exists():
-            self.base_surface = pygame.image.load(str(base_path)).convert_alpha()
-        else:
+        base_path = os.path.join(SPRITE_DIR, "characters", f"{species}_base.png")
+        try:
+            self.base_surface = pygame.image.load(base_path).convert_alpha()
+        except (pygame.error, FileNotFoundError):
             self.base_surface = pygame.Surface((anch["w"], anch["h"]), pygame.SRCALPHA)
 
         # Compute preview scale (fit height to CHAR_PREVIEW_H, keep aspect ratio)
@@ -100,7 +103,6 @@ class DressUpScene(Scene):
         self.preview_scale = CHAR_PREVIEW_H / raw_h
         self.preview_w = max(1, int(raw_w * self.preview_scale))
         self.preview_h = CHAR_PREVIEW_H
-        # Use nearest-neighbor for pixel art crispness
         self.preview_base = pygame.transform.scale(
             self.base_surface, (self.preview_w, self.preview_h))
 
@@ -108,12 +110,16 @@ class DressUpScene(Scene):
         self.overlay_cache = {}
         for slot in BODY_FITTED_SLOTS:
             for acc in ACCESSORIES_BY_SLOT.get(slot, []):
-                # Try per-animal first, fall back to universal
-                per_animal_path = SPRITE_DIR / "accessories" / f"{acc.sprite_key}_{species}.png"
-                universal_path = SPRITE_DIR / "accessories" / f"{acc.sprite_key}.png"
-                path = per_animal_path if per_animal_path.exists() else universal_path
-                if path.exists():
-                    raw = pygame.image.load(str(path)).convert_alpha()
+                per_animal_path = os.path.join(SPRITE_DIR, "accessories", f"{acc.sprite_key}_{species}.png")
+                universal_path = os.path.join(SPRITE_DIR, "accessories", f"{acc.sprite_key}.png")
+                raw = None
+                for try_path in (per_animal_path, universal_path):
+                    try:
+                        raw = pygame.image.load(try_path).convert_alpha()
+                        break
+                    except (pygame.error, FileNotFoundError):
+                        continue
+                if raw:
                     self.overlay_cache[acc.id] = raw
                 else:
                     self.overlay_cache[acc.id] = pygame.Surface(
@@ -123,11 +129,11 @@ class DressUpScene(Scene):
         self.standalone_cache = {}
         for slot in STANDALONE_SLOTS:
             for acc in ACCESSORIES_BY_SLOT.get(slot, []):
-                path = SPRITE_DIR / "accessories" / f"{acc.sprite_key}.png"
-                if path.exists():
-                    raw = pygame.image.load(str(path)).convert_alpha()
+                path = os.path.join(SPRITE_DIR, "accessories", f"{acc.sprite_key}.png")
+                try:
+                    raw = pygame.image.load(path).convert_alpha()
                     self.standalone_cache[acc.id] = raw
-                else:
+                except (pygame.error, FileNotFoundError):
                     self.standalone_cache[acc.id] = pygame.Surface((1, 1), pygame.SRCALPHA)
 
         # --- Build thumbnails ---
@@ -136,7 +142,7 @@ class DressUpScene(Scene):
     def _build_thumbnails(self):
         """Auto-crop each sprite to its opaque bounding box and scale to thumbnail size."""
         self.thumb_surfaces = {}
-        pad = 4  # padding inside button
+        pad = 8  # padding inside button
         max_dim = THUMB_BTN_SIZE - pad * 2
 
         for acc in ACCESSORIES:
@@ -177,11 +183,7 @@ class DressUpScene(Scene):
     @staticmethod
     def _find_opaque_bbox(surface):
         """Return (left, top, right, bottom) of opaque pixels, or None."""
-        w, h = surface.get_size()
-        # Check a few pixels to see if there's anything
         try:
-            # Use pygame's built-in: get_bounding_rect gives the smallest rect
-            # containing all non-transparent pixels
             rect = surface.get_bounding_rect()
             if rect.width == 0 or rect.height == 0:
                 return None
@@ -196,34 +198,34 @@ class DressUpScene(Scene):
         self.item_btn_rects = {}
 
         # Left panel: wardrobe shelf rows
-        left_margin = 20
-        row_w = 260
-        row_h = 52
-        start_y = 50
-        row_gap = 4
+        left_margin = 40
+        row_w = 520
+        row_h = 104
+        start_y = 100
+        row_gap = 8
 
         for i, slot in enumerate(SLOT_ORDER):
             ry = start_y + i * (row_h + row_gap)
             self.slot_row_rects[slot] = pygame.Rect(left_margin, ry, row_w, row_h)
 
             items = ACCESSORIES_BY_SLOT.get(slot, [])
-            # Label takes ~65px, buttons are centered in the remaining space
-            btn_area_x = left_margin + 70
-            btn_area_w = row_w - 70 - 8
-            total_btns_w = len(items) * THUMB_BTN_SIZE + (len(items) - 1) * 6
+            # Label takes ~140px, buttons are centered in the remaining space
+            btn_area_x = left_margin + 140
+            btn_area_w = row_w - 140 - 16
+            total_btns_w = len(items) * THUMB_BTN_SIZE + (len(items) - 1) * 12
             btn_start_x = btn_area_x + (btn_area_w - total_btns_w) // 2
 
             for j, acc in enumerate(items):
-                bx = btn_start_x + j * (THUMB_BTN_SIZE + 6)
+                bx = btn_start_x + j * (THUMB_BTN_SIZE + 12)
                 by = ry + (row_h - THUMB_BTN_SIZE) // 2
                 self.item_btn_rects[acc.id] = pygame.Rect(bx, by, THUMB_BTN_SIZE, THUMB_BTN_SIZE)
 
         # Bottom buttons — placed right after the last shelf row
-        btn_w = 120
-        btn_h = 28
-        btn_gap = 6
+        btn_w = 240
+        btn_h = 56
+        btn_gap = 12
         last_row_bottom = start_y + len(SLOT_ORDER) * (row_h + row_gap)
-        buttons_y = last_row_bottom + 10
+        buttons_y = last_row_bottom + 20
 
         # Row 1: RESET + SAVE OUTFIT side by side
         self.reset_rect = pygame.Rect(left_margin, buttons_y, btn_w, btn_h)
@@ -265,6 +267,7 @@ class DressUpScene(Scene):
 
             elif event.type == pygame.MOUSEMOTION:
                 pos = event.pos
+                self.mouse_logical = pos
                 self.hover_item = None
                 for acc_id, rect in self.item_btn_rects.items():
                     if rect.collidepoint(pos):
@@ -300,37 +303,37 @@ class DressUpScene(Scene):
         surface.fill(COLOR_BG)
 
         # Decorative border frame
-        border = pygame.Rect(6, 6, LOGICAL_WIDTH - 12, LOGICAL_HEIGHT - 12)
-        pygame.draw.rect(surface, COLOR_RULE_LINE, border, 2, border_radius=4)
+        border = pygame.Rect(12, 12, LOGICAL_WIDTH - 24, LOGICAL_HEIGHT - 24)
+        pygame.draw.rect(surface, COLOR_RULE_LINE, border, 2, border_radius=8)
 
         # Title
         species_name = self.character.species.capitalize()
         title = self.title_font.render(f"Dress Up — {species_name}", True, COLOR_TEXT)
         tx = LOGICAL_WIDTH // 2 - title.get_width() // 2
-        ty = 14
+        ty = 28
         surface.blit(title, (tx, ty))
 
         # Decorative squares flanking title
-        sq = 5
+        sq = 10
         sq_y = ty + title.get_height() // 2 - sq // 2
-        pygame.draw.rect(surface, COLOR_PANEL_BORDER, (tx - 14, sq_y, sq, sq))
+        pygame.draw.rect(surface, COLOR_PANEL_BORDER, (tx - 28, sq_y, sq, sq))
         pygame.draw.rect(surface, COLOR_PANEL_BORDER,
-                         (tx + title.get_width() + 8, sq_y, sq, sq))
+                         (tx + title.get_width() + 16, sq_y, sq, sq))
 
         # Rule line under title
-        rule_y = ty + title.get_height() + 4
+        rule_y = ty + title.get_height() + 8
         pygame.draw.line(surface, COLOR_RULE_LINE,
-                         (16, rule_y), (LOGICAL_WIDTH - 16, rule_y), 1)
+                         (32, rule_y), (LOGICAL_WIDTH - 32, rule_y), 2)
 
         # ── Wardrobe shelf (left side) ──
         self._draw_wardrobe(surface)
 
         # ── Character preview (right side) ──
-        char_x = 310
-        char_y = rule_y + 8
+        char_x = 620
+        char_y = rule_y + 16
         comp = self._compose_character()
         # Center the character in the available space
-        avail_w = LOGICAL_WIDTH - char_x - 16
+        avail_w = LOGICAL_WIDTH - char_x - 32
         cx = char_x + (avail_w - self.preview_w) // 2
         surface.blit(comp, (cx, char_y))
 
@@ -339,16 +342,15 @@ class DressUpScene(Scene):
         eq_text = self.small_font.render(
             f"{equipped_count}/5 items equipped", True, COLOR_TEXT_DIM)
         surface.blit(eq_text, (cx + self.preview_w // 2 - eq_text.get_width() // 2,
-                               char_y + self.preview_h + 4))
+                               char_y + self.preview_h + 8))
 
         # ── Bottom buttons ──
-        mx, my = pygame.mouse.get_pos()
-        ml = (mx // SCALE_FACTOR, my // SCALE_FACTOR)
+        ml = self.mouse_logical
 
         # RESET button
         self._draw_button(surface, self.reset_rect, "RESET", ml,
                           idle_color=(200, 180, 155), hover_color=(180, 155, 125))
-        # SAVE OUTFIT → BEGIN ASSESSMENT
+        # Continue
         self._draw_button(surface, self.confirm_rect, "Continue", ml,
                           idle_color=COLOR_BUTTON_IDLE, hover_color=COLOR_BUTTON_HOVER)
         # Exit (smaller text)
@@ -358,7 +360,7 @@ class DressUpScene(Scene):
         # ── Tooltip ──
         if self.tooltip_text:
             tt = self.small_font.render(self.tooltip_text, True, COLOR_ACCENT_DARK)
-            surface.blit(tt, (20, LOGICAL_HEIGHT - 18))
+            surface.blit(tt, (40, LOGICAL_HEIGHT - 36))
 
     def _draw_wardrobe(self, surface):
         """Draw the wardrobe shelf with slot rows and item buttons."""
@@ -366,19 +368,19 @@ class DressUpScene(Scene):
             row_rect = self.slot_row_rects[slot]
 
             # Shelf background (warm wood)
-            pygame.draw.rect(surface, COLOR_SHELF_BG, row_rect, border_radius=4)
+            pygame.draw.rect(surface, COLOR_SHELF_BG, row_rect, border_radius=8)
             # Shelf edge highlights
-            edge_top = pygame.Rect(row_rect.x, row_rect.y, row_rect.w, 2)
+            edge_top = pygame.Rect(row_rect.x, row_rect.y, row_rect.w, 4)
             pygame.draw.rect(surface, COLOR_SHELF_LIGHT, edge_top)
-            edge_bot = pygame.Rect(row_rect.x, row_rect.bottom - 3, row_rect.w, 3)
-            pygame.draw.rect(surface, COLOR_SHELF_DARK, edge_bot, border_radius=2)
+            edge_bot = pygame.Rect(row_rect.x, row_rect.bottom - 6, row_rect.w, 6)
+            pygame.draw.rect(surface, COLOR_SHELF_DARK, edge_bot, border_radius=4)
             # Border
-            pygame.draw.rect(surface, COLOR_SHELF_EDGE, row_rect, 1, border_radius=4)
+            pygame.draw.rect(surface, COLOR_SHELF_EDGE, row_rect, 2, border_radius=8)
 
             # Slot label (left side, vertically centered)
             label = self.label_font.render(SLOT_LABELS[slot], True, COLOR_BG)
             ly = row_rect.centery - label.get_height() // 2
-            surface.blit(label, (row_rect.x + 10, ly))
+            surface.blit(label, (row_rect.x + 20, ly))
 
             # Item thumbnail buttons
             items = ACCESSORIES_BY_SLOT.get(slot, [])
@@ -391,18 +393,18 @@ class DressUpScene(Scene):
                 if is_equipped:
                     bg = COLOR_PANEL_HOVER
                     bc = COLOR_ACCENT
-                    bw = 2
+                    bw = 3
                 elif is_hover:
                     bg = (255, 250, 240)
                     bc = COLOR_ACCENT_LIGHT
-                    bw = 1
+                    bw = 2
                 else:
                     bg = COLOR_PANEL_BG
                     bc = COLOR_PANEL_BORDER
-                    bw = 1
+                    bw = 2
 
-                pygame.draw.rect(surface, bg, rect, border_radius=4)
-                pygame.draw.rect(surface, bc, rect, bw, border_radius=4)
+                pygame.draw.rect(surface, bg, rect, border_radius=8)
+                pygame.draw.rect(surface, bc, rect, bw, border_radius=8)
 
                 # Thumbnail centered in button
                 thumb = self.thumb_surfaces.get(acc.id)
@@ -414,7 +416,7 @@ class DressUpScene(Scene):
                 # Equipped indicator: small dot
                 if is_equipped:
                     pygame.draw.circle(surface, COLOR_ACCENT,
-                                       (rect.right - 5, rect.top + 5), 3)
+                                       (rect.right - 10, rect.top + 10), 6)
 
     def _draw_button(self, surface, rect, text, mouse_logical,
                      idle_color=None, hover_color=None):
@@ -423,8 +425,8 @@ class DressUpScene(Scene):
         hc = hover_color or COLOR_BUTTON_HOVER
         is_hover = rect.collidepoint(mouse_logical)
         bg = hc if is_hover else ic
-        pygame.draw.rect(surface, bg, rect, border_radius=4)
-        pygame.draw.rect(surface, COLOR_PANEL_BORDER, rect, 1, border_radius=4)
+        pygame.draw.rect(surface, bg, rect, border_radius=8)
+        pygame.draw.rect(surface, COLOR_PANEL_BORDER, rect, 2, border_radius=8)
         t = self.font.render(text, True, COLOR_BUTTON_TEXT)
         surface.blit(t, t.get_rect(center=rect.center))
 
@@ -442,7 +444,6 @@ class DressUpScene(Scene):
             aid = self.character.equipped[slot]
             if aid and aid in self.overlay_cache:
                 overlay = self.overlay_cache[aid]
-                # Blit overlay on top (same size as base)
                 comp.blit(overlay, (0, 0))
 
         # Standalone items (neck, glasses, hat) - position via anchors
@@ -465,19 +466,15 @@ class DressUpScene(Scene):
         neck_y = anchors["neck_y"]
 
         if slot == "hat":
-            # Center horizontally on eyes, place above head
             x = eye_cx - sw // 2
-            # Position so bottom of hat sprite is near top of head / above eyes
             y = eye_cy - sh - 10
-            y = max(0, y)  # don't go above canvas
+            y = max(0, y)
         elif slot == "glasses":
-            # Center on eyes
             x = eye_cx - sw // 2
             y = eye_cy - sh // 2
         elif slot == "neck":
-            # Center horizontally on eyes, place at neck
             x = eye_cx - sw // 2
-            y = neck_y - sh // 4  # slight upward offset
+            y = neck_y - sh // 4
         else:
             x, y = 0, 0
 
