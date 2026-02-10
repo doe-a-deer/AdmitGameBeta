@@ -321,9 +321,9 @@ const BODY_FITTED=new Set(["top","bottoms"]);
 const STANDALONE=new Set(["hat","glasses","neck"]);
 
 const ANCHORS={
-  fox:{eye_cx:307,eye_cy:235,neck_y:368,w:522,h:609},
-  dog:{eye_cx:227,eye_cy:190,neck_y:310,w:447,h:548},
-  cat:{eye_cx:176,eye_cy:222,neck_y:356,w:365,h:587},
+  fox:{eye_cx:307,eye_cy:228,neck_y:368,w:522,h:609},
+  dog:{eye_cx:222,eye_cy:178,neck_y:310,w:447,h:548},
+  cat:{eye_cx:176,eye_cy:225,neck_y:351,w:365,h:587},
 };
 
 const ACCEPTANCE_LETTERS={
@@ -690,9 +690,9 @@ class DressUpScene extends Scene {
   }
   _anchorPos(slot,img,a){
     const sw=img.width,sh=img.height;
-    if(slot==='hat')return{x:a.eye_cx-sw/2,y:Math.max(0,a.eye_cy-sh-10)};
-    if(slot==='glasses')return{x:a.eye_cx-sw/2,y:a.eye_cy-sh/2};
-    if(slot==='neck')return{x:a.eye_cx-sw/2,y:a.neck_y-sh/4};
+    if(slot==='hat')return{x:a.eye_cx-sw/2,y:Math.max(0,a.eye_cy-sh-30)};
+    if(slot==='glasses')return{x:a.eye_cx-sw/2,y:a.eye_cy-sh/2-8};
+    if(slot==='neck')return{x:a.eye_cx-sw/2,y:a.neck_y-sh/6};
     return{x:0,y:0};
   }
 }
